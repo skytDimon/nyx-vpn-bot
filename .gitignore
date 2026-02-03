@@ -1,0 +1,9 @@
+.env
+services/bot/.env
+env/
+**/__pycache__/
+*.pyc
+.DS_Store
+services/bot/bot.db
+.ruff_cache/
+.idea/

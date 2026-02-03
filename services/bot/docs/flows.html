@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Потоки бота</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f4ef;
+        --ink: #1e1e1e;
+        --muted: #6f6a62;
+        --card: #ffffff;
+        --accent: #1c6b60;
+        --stroke: #d9d3ca;
+      }
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Source Sans 3", "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, #ffffff, var(--bg));
+        color: var(--ink);
+      }
+      header {
+        padding: 32px 24px 16px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+      main {
+        display: grid;
+        gap: 16px;
+        padding: 16px 24px 40px;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+      section {
+        background: var(--card);
+        border: 1px solid var(--stroke);
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      }
+      section h2 {
+        margin: 0 0 12px;
+        font-size: 20px;
+      }
+      ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+      li {
+        margin: 6px 0;
+      }
+      .tag {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(28, 107, 96, 0.12);
+        color: var(--accent);
+        font-size: 12px;
+        margin-left: 6px;
+      }
+      footer {
+        padding: 0 24px 32px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Потоки бота</h1>
+      <p>Краткая визуальная шпаргалка по ключевым сценариям работы.</p>
+    </header>
+    <main>
+      <section>
+        <h2>Покупка подписки <span class="tag">баланс</span></h2>
+        <ol>
+          <li>Пользователь: «Тарифы»</li>
+          <li>Бот: карточка тарифа + кнопки</li>
+          <li>Пользователь: tariff:connect</li>
+          <li>Бот: выбор страны</li>
+          <li>Пользователь: country:fi</li>
+          <li>Бот: варианты оплаты</li>
+          <li>Пользователь: pay:balance</li>
+          <li>Бот: списание баланса + создание клиента XUI</li>
+          <li>Бот: запись подписки в БД + Redis</li>
+          <li>Бот: отправка инструкции и ссылки</li>
+        </ol>
+      </section>
+      <section>
+        <h2>Личный кабинет</h2>
+        <ol>
+          <li>Пользователь: «Личный кабинет»</li>
+          <li>Бот: запрос статуса подписки в XUI</li>
+          <li>Бот: чтение подписки из БД/Redis</li>
+          <li>Бот: вывод статуса + инструкции</li>
+          <li>Если подписки нет — кнопка «Купить»</li>
+        </ol>
+      </section>
+      <section>
+        <h2>Реферальный старт</h2>
+        <ol>
+          <li>Пользователь: /start &lt;ref_tg_id&gt;</li>
+          <li>Бот: ensure_user</li>
+          <li>Бот: set_referrer</li>
+          <li>Бот: приветствие + меню</li>
+        </ol>
+      </section>
+    </main>
+    <footer>
+      Обновляй при изменении сценариев в `services/bot/app/handlers/start.py`.
+    </footer>
+  </body>
+</html>

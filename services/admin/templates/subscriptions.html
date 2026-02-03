@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% set title = "Подписки" %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Подписки</h1>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>tg_id</th>
+            <th>start_at</th>
+            <th>end_at</th>
+            <th>subscription_link</th>
+            <th>updated_at</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sub in subscriptions %}
+            <tr>
+              <td>{{ sub.tg_id }}</td>
+              <td>{{ sub.start_at }}</td>
+              <td>{{ sub.end_at }}</td>
+              <td class="truncate">{{ sub.subscription_link or '-' }}</td>
+              <td>{{ sub.updated_at }}</td>
+              <td><a href="/admin/subscriptions/{{ sub.tg_id }}">открыть</a></td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" class="empty">Нет данных</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <span>Страница {{ page }} из {{ total_pages }}</span>
+      <div class="pagination-links">
+        {% if page > 1 %}
+          <a href="/admin/subscriptions?page={{ page - 1 }}&limit={{ limit }}">Назад</a>
+        {% endif %}
+        {% if page < total_pages %}
+          <a href="/admin/subscriptions?page={{ page + 1 }}&limit={{ limit }}">Вперёд</a>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

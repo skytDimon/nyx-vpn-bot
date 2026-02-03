@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% set title = "Пользователь" %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Пользователь {{ user.tg_id }}</h1>
+    <div class="card">
+      <div><strong>Username:</strong> {{ user.username or "-" }}</div>
+      <div><strong>Создан:</strong> {{ user.created_at }}</div>
+      {% if user.username %}
+        <div><strong>Профиль:</strong> <a href="https://t.me/{{ user.username }}" target="_blank">@{{ user.username }}</a></div>
+      {% endif %}
+    </div>
+
+    <form class="form" method="post" action="/admin/users/{{ user.tg_id }}">
+      <label>
+        Username
+        <input type="text" name="username" value="{{ user.username or '' }}" />
+      </label>
+      <label>
+        Баланс
+        <input type="number" name="balance" value="{{ user.balance }}" />
+      </label>
+      <label>
+        Реферальный баланс
+        <input type="number" name="referral_balance" value="{{ user.referral_balance }}" />
+      </label>
+      <div class="form-actions">
+        <button type="submit">Сохранить</button>
+        <a class="ghost" href="/admin/users">Назад</a>
+      </div>
+    </form>
+
+    <form method="post" action="/admin/users/{{ user.tg_id }}/delete" onsubmit="return confirm('Удалить пользователя?');">
+      <button class="danger" type="submit">Удалить пользователя</button>
+    </form>
+  </section>
+{% endblock %}

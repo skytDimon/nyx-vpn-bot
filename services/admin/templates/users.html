@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% set title = "Пользователи" %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Пользователи</h1>
+    <form class="search" method="get" action="/admin/users">
+      <input type="text" name="search" value="{{ search }}" placeholder="tg_id или username" />
+      <button type="submit">Найти</button>
+    </form>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>tg_id</th>
+            <th>username</th>
+            <th>ссылка</th>
+            <th>balance</th>
+            <th>ref_balance</th>
+            <th>created_at</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+            <tr>
+              <td>{{ user.tg_id }}</td>
+              <td>{{ user.username or "-" }}</td>
+              <td>
+                {% if user.username %}
+                  <a href="https://t.me/{{ user.username }}" target="_blank">профиль</a>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ user.balance }}</td>
+              <td>{{ user.referral_balance }}</td>
+              <td>{{ user.created_at }}</td>
+              <td><a href="/admin/users/{{ user.tg_id }}">открыть</a></td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7" class="empty">Нет данных</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <span>Страница {{ page }} из {{ total_pages }}</span>
+      <div class="pagination-links">
+        {% if page > 1 %}
+          <a href="/admin/users?page={{ page - 1 }}&limit={{ limit }}&search={{ search }}">Назад</a>
+        {% endif %}
+        {% if page < total_pages %}
+          <a href="/admin/users?page={{ page + 1 }}&limit={{ limit }}&search={{ search }}">Вперёд</a>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+{% endblock %}
