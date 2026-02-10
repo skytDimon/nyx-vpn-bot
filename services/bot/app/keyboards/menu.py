@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -39,6 +41,8 @@ def tariffs_keyboard() -> InlineKeyboardMarkup:
 
 
 def payments_keyboard() -> InlineKeyboardMarkup:
+    support_text = "привет хочу купить подписку на впн"
+    support_url = f"https://t.me/SkytNinja?text={quote(support_text)}"
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -46,6 +50,7 @@ def payments_keyboard() -> InlineKeyboardMarkup:
                     text="💳 Оплатить с баланса", callback_data="pay:balance"
                 )
             ],
+            [InlineKeyboardButton(text="🏦 Оплатить через РФ банк", url=support_url)],
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="back:countries")],
         ]
     )
