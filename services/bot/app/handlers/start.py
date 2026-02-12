@@ -15,6 +15,7 @@ from app.keyboards.menu import (
     main_menu_keyboard,
     personal_cabinet_keyboard,
     payments_keyboard,
+    setup_keyboard,
     tariffs_keyboard,
 )
 import httpx
@@ -125,6 +126,51 @@ async def info_handler(message: Message):
         )
     else:
         await message.answer(text, reply_markup=main_menu_keyboard())
+
+
+@router.message(lambda message: message.text in {"⚙️ Настройка", "Настройка"})
+async def setup_handler(message: Message):
+    await message.answer(
+        "Выберите приложение для настройки:", reply_markup=setup_keyboard()
+    )
+
+
+@router.callback_query(F.data == "back:setup")
+async def setup_back(callback: CallbackQuery):
+    if callback.message.photo:
+        await callback.message.edit_caption(
+            caption="Выберите приложение для настройки:",
+            reply_markup=setup_keyboard(),
+        )
+    else:
+        await callback.message.edit_text(
+            "Выберите приложение для настройки:", reply_markup=setup_keyboard()
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("setup:"))
+async def setup_choice(callback: CallbackQuery):
+    choice = callback.data.split(":", 1)[1]
+    if choice == "v2raytun":
+        text = (
+            "V2rayTun\n\n"
+            "1) Установите V2rayTun из App Store/Google Play.\n"
+            "2) Откройте приложение и выберите импорт по ссылке.\n"
+            "3) Вставьте свою VPN-ссылку и обновите список."
+        )
+    else:
+        text = (
+            "Happ\n\n"
+            "1) Установите Happ из App Store/Google Play.\n"
+            "2) В разделе подписок добавьте ссылку.\n"
+            "3) Обновите профиль и подключитесь."
+        )
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=text, reply_markup=setup_keyboard())
+    else:
+        await callback.message.edit_text(text, reply_markup=setup_keyboard())
+    await callback.answer()
 
 
 @router.message(Command("balance"))

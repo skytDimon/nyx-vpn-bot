@@ -16,6 +16,7 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="👤 Личный кабинет"),
             ],
             [KeyboardButton(text="ℹ️ Информация")],
+            [KeyboardButton(text="⚙️ Настройка")],
             [KeyboardButton(text="🎁 Пригласи друга")],
             [KeyboardButton(text="🧑‍💻 Help")],
         ],
@@ -79,6 +80,16 @@ def personal_cabinet_keyboard(show_buy: bool = False) -> InlineKeyboardMarkup:
             0, [InlineKeyboardButton(text="🛒 Купить", callback_data="cabinet:buy")]
         )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def setup_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="V2rayTun", callback_data="setup:v2raytun")],
+            [InlineKeyboardButton(text="Happ", callback_data="setup:happ")],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="back:setup")],
+        ]
+    )
 
 
 def countries_keyboard() -> InlineKeyboardMarkup:
