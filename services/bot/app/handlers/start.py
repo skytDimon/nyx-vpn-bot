@@ -93,7 +93,7 @@ async def tariffs_handler(message: Message):
 @router.message(lambda message: message.text in {"Help", "🧑‍💻 Help"})
 async def help_handler(message: Message):
     await message.answer(
-        "🧑‍💻 Саппорт: @skytninja \n Время ответа ~2 часа",
+        "🧑‍💻 Саппорт: @nyxsupportvpn \n Время ответа ~2 часа",
         reply_markup=main_menu_keyboard(),
     )
 
