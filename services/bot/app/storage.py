@@ -233,23 +233,27 @@ def set_subscription(
     end_at: datetime,
     subscription_link: str,
     instructions: str,
+    country: str = "fi",
 ) -> None:
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO subscriptions (tg_id, start_at, end_at, subscription_link, instructions)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO subscriptions (tg_id, start_at, end_at, subscription_link, instructions, country)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (tg_id)
                 DO UPDATE SET start_at = EXCLUDED.start_at,
                               end_at = EXCLUDED.end_at,
                               subscription_link = EXCLUDED.subscription_link,
                               instructions = EXCLUDED.instructions,
+                              country = EXCLUDED.country,
                               updated_at = NOW()
                 """,
-                (tg_id, start_at, end_at, subscription_link, instructions),
+                (tg_id, start_at, end_at, subscription_link, instructions, country),
             )
-    _cache_set_subscription(tg_id, start_at, end_at, subscription_link, instructions)
+    _cache_set_subscription(
+        tg_id, start_at, end_at, subscription_link, instructions, country
+    )
 
 
 def get_subscription(tg_id: int) -> tuple[datetime | None, datetime | None]:
@@ -259,7 +263,10 @@ def get_subscription(tg_id: int) -> tuple[datetime | None, datetime | None]:
     with _connect() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT start_at, end_at, subscription_link, instructions FROM subscriptions WHERE tg_id = %s",
+                """
+                SELECT start_at, end_at, subscription_link, instructions, country
+                FROM subscriptions WHERE tg_id = %s
+                """,
                 (tg_id,),
             )
             row = cur.fetchone()
@@ -277,6 +284,7 @@ def get_subscription(tg_id: int) -> tuple[datetime | None, datetime | None]:
                 end_at,
                 row["subscription_link"],
                 row["instructions"],
+                row.get("country") or "fi",
             )
             return start_at, end_at
 
@@ -288,7 +296,10 @@ def get_vpn_data(tg_id: int) -> tuple[str | None, str | None]:
     with _connect() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT subscription_link, instructions, end_at FROM subscriptions WHERE tg_id = %s",
+                """
+                SELECT subscription_link, instructions, end_at, country
+                FROM subscriptions WHERE tg_id = %s
+                """,
                 (tg_id,),
             )
             row = cur.fetchone()
@@ -300,6 +311,43 @@ def get_vpn_data(tg_id: int) -> tuple[str | None, str | None]:
                 clear_subscription(tg_id)
                 return None, None
             return row["subscription_link"], row["instructions"]
+
+
+def get_subscription_meta(tg_id: int) -> dict | None:
+    cached = _cache_get_subscription(tg_id)
+    if cached:
+        return {
+            "start_at": cached["start_at"],
+            "end_at": cached["end_at"],
+            "subscription_link": cached["subscription_link"],
+            "instructions": cached["instructions"],
+            "country": cached.get("country") or "fi",
+        }
+    with _connect() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT start_at, end_at, subscription_link, instructions, country
+                FROM subscriptions WHERE tg_id = %s
+                """,
+                (tg_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            end_at = _normalize_dt(row["end_at"])
+            if end_at and end_at < datetime.now(timezone.utc):
+                clear_subscription(tg_id)
+                return None
+            _cache_set_subscription(
+                tg_id,
+                row["start_at"],
+                row["end_at"],
+                row["subscription_link"],
+                row["instructions"],
+                row.get("country") or "fi",
+            )
+            return row
 
 
 def clear_subscription(tg_id: int) -> None:
@@ -331,6 +379,66 @@ def fetch_subscription_end_dates() -> list[dict]:
             return list(cur.fetchall())
 
 
+def fetch_active_subscriptions_with_users(country: str | None = None) -> list[dict]:
+    with _connect() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if country:
+                cur.execute(
+                    """
+                    SELECT s.tg_id, s.start_at, s.end_at, u.username, s.country
+                    FROM subscriptions s
+                    LEFT JOIN users u ON u.tg_id = s.tg_id
+                    WHERE s.end_at IS NOT NULL AND s.end_at > NOW() AND s.country = %s
+                    """,
+                    (country,),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT s.tg_id, s.start_at, s.end_at, u.username, s.country
+                    FROM subscriptions s
+                    LEFT JOIN users u ON u.tg_id = s.tg_id
+                    WHERE s.end_at IS NOT NULL AND s.end_at > NOW()
+                    """
+                )
+            return list(cur.fetchall())
+
+
+def update_subscription_record(
+    tg_id: int,
+    start_at: datetime | None,
+    end_at: datetime | None,
+    subscription_link: str | None,
+    instructions: str | None,
+    country: str | None = None,
+) -> None:
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE subscriptions
+                SET start_at = %s,
+                    end_at = %s,
+                    subscription_link = %s,
+                    instructions = %s,
+                    country = COALESCE(%s, country),
+                    updated_at = NOW()
+                WHERE tg_id = %s
+                """,
+                (start_at, end_at, subscription_link, instructions, country, tg_id),
+            )
+    _cache_set_subscription(
+        tg_id, start_at, end_at, subscription_link, instructions, country
+    )
+
+
+def fetch_all_user_ids() -> list[int]:
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT tg_id FROM users")
+            return [row[0] for row in cur.fetchall()]
+
+
 def _cache_key(tg_id: int) -> str:
     return f"subscription:{tg_id}"
 
@@ -341,6 +449,7 @@ def _cache_set_subscription(
     end_at: datetime | None,
     subscription_link: str | None,
     instructions: str | None,
+    country: str | None = None,
 ) -> None:
     if not end_at:
         return
@@ -356,6 +465,7 @@ def _cache_set_subscription(
             "end_at": end_at.isoformat() if end_at else None,
             "subscription_link": subscription_link,
             "instructions": instructions,
+            "country": country,
         }
     )
     try:
@@ -385,6 +495,7 @@ def _cache_get_subscription(tg_id: int) -> dict | None:
         "end_at": end_at,
         "subscription_link": data.get("subscription_link"),
         "instructions": data.get("instructions"),
+        "country": data.get("country") or "fi",
     }
 
 

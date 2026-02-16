@@ -28,11 +28,14 @@ from app.storage import (
     ensure_user,
     get_referral_info,
     get_subscription,
+    get_subscription_meta,
     get_vpn_data,
     record_first_payment,
     set_referrer,
     set_subscription,
 )
+from app.vpn_instructions import vpn_instructions
+from app.config import get_required_channel_id, get_sub_landing_base, get_xui_settings
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -242,7 +245,7 @@ async def connect_tariff(callback: CallbackQuery):
 @router.callback_query(F.data == "tariff:trial")
 async def trial_tariff(callback: CallbackQuery):
     ensure_user(callback.from_user.id, callback.from_user.username)
-    _, _, xui_end_at = await _fetch_xui_subscription(callback.from_user)
+    _, _, xui_end_at = await _fetch_xui_subscription(callback.from_user, "fi")
     end_at = xui_end_at
     if not end_at:
         _, end_at = get_subscription(callback.from_user.id)
@@ -275,7 +278,7 @@ async def trial_tariff(callback: CallbackQuery):
     finally:
         await xui.close()
 
-    instructions = _vpn_instructions(sub_link)
+    instructions = vpn_instructions(sub_link)
     link_image = Path(__file__).resolve().parents[2] / "img" / "link.png"
     if link_image.exists():
         await callback.bot.send_photo(
@@ -300,6 +303,7 @@ async def trial_tariff(callback: CallbackQuery):
         end_at,
         sub_link,
         instructions,
+        "fi",
     )
     await callback.message.answer(
         "🎉 Пробный период на 3 дня активирован.",
@@ -308,8 +312,12 @@ async def trial_tariff(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(F.data == "pay:balance")
+@router.callback_query(F.data.startswith("pay:balance:"))
 async def pay_handler(callback: CallbackQuery):
+    country = callback.data.split(":", 2)[2]
+    if country not in {"fi", "nl"}:
+        await callback.answer()
+        return
     ensure_user(callback.from_user.id, callback.from_user.username)
     if not deduct_balance(callback.from_user.id, TARIFF_PRICE):
         await callback.message.answer(
@@ -320,7 +328,8 @@ async def pay_handler(callback: CallbackQuery):
         return
     username = callback.from_user.username or f"tg_{callback.from_user.id}"
     email = f"@{username}"
-    xui = XuiClient.from_env()
+    settings = get_xui_settings(country)
+    xui = XuiClient.from_settings(settings)
     try:
         await xui.login()
         sub_id = await xui.add_client(email=email, days=TARIFF_DAYS)
@@ -343,7 +352,13 @@ async def pay_handler(callback: CallbackQuery):
         return
     finally:
         await xui.close()
-    instructions = _vpn_instructions(sub_link)
+    landing_base = get_sub_landing_base(country)
+    if country == "nl" and landing_base:
+        landing_link = f"{landing_base}/{sub_id}"
+        instructions = vpn_instructions(landing_link, landing=True)
+        sub_link = landing_link
+    else:
+        instructions = vpn_instructions(sub_link)
     link_image = Path(__file__).resolve().parents[2] / "img" / "link.png"
     if link_image.exists():
         await callback.bot.send_photo(
@@ -367,6 +382,7 @@ async def pay_handler(callback: CallbackQuery):
         end_at,
         sub_link,
         instructions,
+        country,
     )
     if record_first_payment(callback.from_user.id, TARIFF_PRICE):
         logger.info(
@@ -378,16 +394,32 @@ async def pay_handler(callback: CallbackQuery):
 
 async def _personal_cabinet_text(user) -> tuple[str, bool]:
     ensure_user(user.id, user.username)
-    xui_available, xui_link, xui_end_at = await _fetch_xui_subscription(user)
+    meta = get_subscription_meta(user.id)
+    country = "fi"
+    if meta and isinstance(meta.get("country"), str):
+        country = meta["country"]
+    xui_available, xui_link, xui_end_at = await _fetch_xui_subscription(user, country)
     if xui_available and not xui_link and not xui_end_at:
         clear_subscription(user.id)
         return "❌ Подписка не активна", False
     subscription_link, instructions = get_vpn_data(user.id)
     if xui_available and xui_link:
-        subscription_link = xui_link
-        instructions = _vpn_instructions(xui_link)
+        if country == "nl":
+            landing_base = get_sub_landing_base("nl")
+            if landing_base:
+                subscription_link = f"{landing_base}/{xui_link.split('/')[-1]}"
+                instructions = vpn_instructions(subscription_link, landing=True)
+            else:
+                subscription_link = xui_link
+                instructions = vpn_instructions(xui_link)
+        else:
+            subscription_link = xui_link
+            instructions = vpn_instructions(xui_link)
     elif subscription_link and not instructions:
-        instructions = _vpn_instructions(subscription_link)
+        if country == "nl":
+            instructions = vpn_instructions(subscription_link, landing=True)
+        else:
+            instructions = vpn_instructions(subscription_link)
 
     end_at = xui_end_at
     if not end_at:
@@ -401,26 +433,13 @@ async def _personal_cabinet_text(user) -> tuple[str, bool]:
     return f"✅ Активна до {end_str}", True
 
 
-def _vpn_instructions(link: str) -> str:
-    return (
-        "🔗 Ваша ссылка на VPN:\n"
-        f"{link}\n\n"
-        "📲 Подключение (на выбор):\n"
-        "• V2rayTun:\n"
-        "  1) Перейдите по ссылке и скопируйте большой текст, начинающийся с 'vless'.\n"
-        "  2) Откройте приложение → «+» → «Добавить из буфера обмена».\n"
-        "• Happ:\n"
-        "  1) Перейдите по ссылке, пролистайте ниже и выберите iOS или Android.\n"
-        "  2) Нажмите Happ в меню.\n"
-        "  3) Обновите подписку в приложении.\n\n"
-        "Приятного пользования!"
-    )
-
-
-async def _fetch_xui_subscription(user) -> tuple[bool, str | None, datetime | None]:
+async def _fetch_xui_subscription(
+    user, country: str
+) -> tuple[bool, str | None, datetime | None]:
     email = _email_for_user(user)
     try:
-        xui = XuiClient.from_env()
+        settings = get_xui_settings(country)
+        xui = XuiClient.from_settings(settings)
     except RuntimeError:
         return False, None, None
     try:
@@ -451,14 +470,34 @@ def _normalize_dt(value: datetime | None) -> datetime | None:
 
 @router.callback_query(F.data.startswith("country:"))
 async def choose_country(callback: CallbackQuery):
-    text = "🇫🇮 Сервер Finland выбран.\nОплата с баланса доступна ниже."
+    country_map = {
+        "fi": "🇫🇮 Сервер Finland выбран.",
+        "nl": "🇳🇱 Сервер Netherlands выбран.",
+    }
+    code = callback.data.split(":", 1)[1]
+    text = (
+        country_map.get(code, "✅ Сервер выбран.") + "\nОплата с баланса доступна ниже."
+    )
     if callback.message.photo:
         await callback.message.edit_caption(
-            caption=text, reply_markup=payments_keyboard()
+            caption=text, reply_markup=payments_keyboard(code)
         )
     else:
-        await callback.message.edit_text(text, reply_markup=payments_keyboard())
+        await callback.message.edit_text(text, reply_markup=payments_keyboard(code))
     await callback.answer()
+
+
+@router.callback_query(F.data == "check:sub")
+async def check_subscription(callback: CallbackQuery):
+    channel_id = get_required_channel_id()
+    try:
+        member = await callback.bot.get_chat_member(channel_id, callback.from_user.id)
+        if member.status in {"member", "administrator", "creator"}:
+            await callback.answer("✅ Подписка подтверждена", show_alert=True)
+            return
+    except Exception:
+        pass
+    await callback.answer("⚠️ Подписка не найдена", show_alert=True)
 
 
 @router.callback_query(F.data == "balance:topup")

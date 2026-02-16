@@ -14,6 +14,9 @@ async def choose_plan(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("pay:balance:"))
 async def pay_balance_plan(callback: CallbackQuery):
+    if callback.data in {"pay:balance:fi", "pay:balance:nl"}:
+        await callback.answer()
+        return
     await callback.message.answer(
         "⚠️ Оплата по планам с баланса пока недоступна. Используйте тариф с оплатой с баланса."
     )

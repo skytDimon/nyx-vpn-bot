@@ -5,6 +5,7 @@ import psycopg2
 import redis
 
 from app.config import get_database_url, get_redis_url
+from app.config import get_xui_settings
 from app.services.xui_client import XuiClient
 
 
@@ -38,7 +39,20 @@ async def _check_xui() -> None:
         await xui.close()
 
 
+async def _check_xui_optional(country: str) -> None:
+    try:
+        settings = get_xui_settings(country)
+    except RuntimeError:
+        return
+    xui = XuiClient.from_settings(settings)
+    try:
+        await xui.login()
+    finally:
+        await xui.close()
+
+
 async def run_preflight() -> None:
     await asyncio.to_thread(_check_db)
     await asyncio.to_thread(_check_redis)
     await _check_xui()
+    await _check_xui_optional("nl")

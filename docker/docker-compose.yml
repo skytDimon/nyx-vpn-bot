@@ -36,6 +36,28 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  sub:
+    build:
+      context: ../services/sub
+    env_file:
+      - ../.env
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - sub
+    restart: unless-stopped
+
 volumes:
   pg_data:
   redis_data:
+  caddy_data:
+  caddy_config:

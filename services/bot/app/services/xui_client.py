@@ -33,6 +33,10 @@ class XuiClient:
     @classmethod
     def from_env(cls) -> "XuiClient":
         settings = get_xui_settings()
+        return cls.from_settings(settings)
+
+    @classmethod
+    def from_settings(cls, settings) -> "XuiClient":
         base_url = settings.base_url
         username = settings.username
         password = settings.password

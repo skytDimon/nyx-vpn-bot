@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYX VPN — Подключение</title>
+    <!-- Подключение Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключение премиального шрифта -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #000000;
+            --card-bg: #0a0a0a;
+            --amber-accent: #facc15; /* Мягкий янтарный желтый */
+            --amber-muted: #713f12;
+            --text-secondary: #a1a1aa;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at 50% -20%, #1a1500 0%, transparent 60%);
+            color: #ffffff;
+            -webkit-font-smoothing: antialiased;
+            letter-spacing: -0.01em;
+        }
+        .nyx-premium-title {
+            font-weight: 800;
+            color: var(--amber-accent);
+            text-transform: uppercase;
+            letter-spacing: 0.25em;
+            text-shadow: 0 0 25px rgba(250, 204, 21, 0.4);
+            animation: glow-pulse 4s infinite ease-in-out;
+        }
+        @keyframes glow-pulse {
+            0%, 100% { opacity: 0.8; filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.2)); }
+            50% { opacity: 1; filter: drop-shadow(0 0 15px rgba(250, 204, 21, 0.6)); }
+        }
+        .main-card {
+            background-color: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 1);
+        }
+        .app-tab {
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            border-radius: 28px;
+        }
+        .app-tab.active {
+            background: #ffffff;
+            color: #000000;
+            border-color: #ffffff;
+            transform: translateY(-4px);
+            box-shadow: 0 15px 30px -10px rgba(255, 255, 255, 0.1);
+        }
+        .app-tab.active .dot {
+            background-color: var(--amber-accent);
+            box-shadow: 0 0 12px var(--amber-accent);
+        }
+        .app-tab.active .tab-label { color: #52525b; }
+        .app-tab.active .tab-name { color: #000000; }
+
+        .btn-action {
+            background-color: var(--amber-accent);
+            color: #000000;
+            font-weight: 800;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .btn-action:hover {
+            transform: scale(1.02);
+            filter: brightness(1.1);
+            box-shadow: 0 10px 30px rgba(250, 204, 21, 0.2);
+        }
+        .btn-action:active {
+            transform: scale(0.96);
+        }
+        .step-num {
+            color: var(--amber-accent);
+            font-weight: 900;
+            font-size: 1.25rem;
+            opacity: 0.9;
+        }
+        .custom-select {
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            font-weight: 700;
+            appearance: none;
+            padding: 8px 32px 8px 16px;
+            border-radius: 12px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a1a1aa'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 0.8rem;
+        }
+        #toast {
+            visibility: hidden;
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: #ffffff;
+            color: #000;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 800;
+            font-size: 13px;
+            z-index: 100;
+            opacity: 0;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div id="toast">Конфигурация скопирована</div>
+
+    <!-- Заголовок страницы -->
+    <div class="mb-12 text-center">
+        <h2 class="nyx-premium-title text-[10px]">NYX VPN</h2>
+    </div>
+
+    <div class="max-w-md w-full main-card rounded-[3.5rem] p-8 md:p-12 overflow-hidden relative">
+        <!-- Декоративное свечение внутри карточки -->
+        <div class="absolute -top-24 -right-24 w-48 h-48 bg-yellow-500/5 blur-[100px] rounded-full"></div>
+
+        <!-- Шапка карточки -->
+        <div class="flex items-center justify-between mb-12">
+            <h1 class="text-3xl font-black tracking-tight text-white">Подключение</h1>
+            <select id="os-selector" class="custom-select text-[11px] outline-none cursor-pointer">
+                <option value="ios">iOS</option>
+                <option value="android">Android</option>
+                <option value="windows">Windows</option>
+                <option value="macos">macOS</option>
+            </select>
+        </div>
+
+        <!-- Вкладки приложений -->
+        <div id="app-tabs" class="grid grid-cols-2 gap-4 mb-12">
+            <!-- Вкладки будут созданы через JavaScript -->
+        </div>
+
+        <!-- Пошаговая инструкция -->
+        <div class="space-y-12">
+            <!-- Шаг 1: Ссылки на установку -->
+            <div class="flex gap-6">
+                <span class="step-num">1</span>
+                <div class="flex-1">
+                    <h3 class="font-black text-[9px] uppercase tracking-[0.25em] text-zinc-600 mb-4">Приложение</h3>
+                    <div id="install-links" class="flex flex-col gap-2">
+                        <!-- Ссылки будут вставлены здесь -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Шаг 2: Кнопка импорта -->
+            <div class="flex gap-6">
+                <span class="step-num">2</span>
+                <div class="flex-1">
+                    <h3 class="font-black text-[9px] uppercase tracking-[0.25em] text-zinc-600 mb-4">Настройка</h3>
+                    <button id="importBtn" class="btn-action w-full py-5 rounded-3xl text-[11px] uppercase tracking-[0.15em] flex items-center justify-center">
+                        Импорт в Happ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Шаг 3: Финальные инструкции -->
+            <div class="flex gap-6">
+                <span class="step-num">3</span>
+                <div>
+                    <h3 class="font-black text-[9px] uppercase tracking-[0.25em] text-zinc-600 mb-2">Старт</h3>
+                    <p class="text-zinc-500 text-xs leading-relaxed font-semibold">
+                        Обновите список серверов и нажмите на кнопку щита для подключения.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Нижняя кнопка для ручного копирования -->
+        <div class="mt-16 text-center">
+            <button id="copyBtn" class="text-[9px] font-black uppercase tracking-[0.35em] text-zinc-700 hover:text-amber-500 transition-all">
+                Скопировать ссылку вручную
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Константа со ссылкой на вашу подписку
+        const subUrl = "{{ sub_url }}";
+
+        // Определения приложений
+        const HAPP = { id: 'HAPP', name: 'Happ', scheme: 'happ' };
+        const V2RAY = { id: 'V2RAY', name: 'V2rayTun', scheme: 'v2raytun' };
+        const V2RAYN = { id: 'V2RAYN', name: 'v2rayN', scheme: 'v2rayn' };
+
+        // Данные по платформам
+        const appsData = {
+            ios: [
+                { ...HAPP, links: [{ text: 'App Store', url: 'https://apps.apple.com/ru/app/happ-proxy-privacy-vpn/id6449157023' }] },
+                { ...V2RAY, links: [{ text: 'App Store', url: 'https://apps.apple.com/ru/app/v2raytun/id6476628951' }] }
+            ],
+            android: [
+                { ...HAPP, links: [{ text: 'Google Play', url: 'https://play.google.com/store/apps/details?id=com.happproxy' }] },
+                { ...V2RAY, links: [{ text: 'Google Play', url: 'https://play.google.com/store/apps/details?id=com.v2raytun.android' }] }
+            ],
+            windows: [
+                { ...V2RAYN, links: [{ text: 'GitHub', url: 'https://github.com/v2rayN/v2rayN/releases' }] }
+            ],
+            macos: [
+                { ...HAPP, links: [{ text: 'Mac App Store', url: 'https://apps.apple.com/ru/app/happ-proxy-privacy-vpn/id6449157023' }] }
+            ]
+        };
+
+        let currentOS = 'ios';
+        let currentAppIdx = 0;
+
+        // Основная функция рендеринга
+        function render() {
+            const tabsContainer = document.getElementById('app-tabs');
+            const linksContainer = document.getElementById('install-links');
+            const apps = appsData[currentOS];
+
+            // Отрисовка вкладок
+            tabsContainer.innerHTML = '';
+            apps.forEach((app, i) => {
+                const tab = document.createElement('div');
+                tab.className = `app-tab p-6 cursor-pointer flex flex-col justify-between relative overflow-hidden ${i === currentAppIdx ? 'active' : ''}`;
+                tab.innerHTML = `
+                    <div class="flex items-center mb-6">
+                        <div class="dot w-2 h-2 rounded-full bg-zinc-800 transition-all"></div>
+                        <span class="tab-label ml-2 text-[9px] font-black uppercase tracking-tight opacity-70">${app.id}</span>
+                    </div>
+                    <div class="tab-name font-black text-lg">${app.name}</div>
+                `;
+                tab.onclick = () => { currentAppIdx = i; render(); };
+                tabsContainer.appendChild(tab);
+            });
+
+            // Отрисовка ссылок для скачивания
+            linksContainer.innerHTML = '';
+            const currentApp = apps[currentAppIdx];
+            currentApp.links.forEach(l => {
+                const a = document.createElement('a');
+                a.href = l.url;
+                a.target = "_blank";
+                a.className = "text-zinc-200 text-[11px] font-bold py-4 px-6 rounded-2xl border border-white/5 bg-white/5 hover:bg-white/10 transition-all flex justify-between items-center";
+                a.innerHTML = `<span>${l.text}</span> <span class="text-amber-500 font-black">→</span>`;
+                linksContainer.appendChild(a);
+            });
+
+            // Обновление текста на кнопке импорта
+            document.getElementById('importBtn').innerText = `Импорт в ${currentApp.name}`;
+        }
+
+        // Выбор ОС
+        document.getElementById('os-selector').onchange = (e) => {
+            currentOS = e.target.value;
+            currentAppIdx = 0;
+            render();
+        };
+
+        // Логика копирования ссылки
+        document.getElementById('copyBtn').onclick = async () => {
+            const t = document.getElementById('toast');
+            try {
+                await navigator.clipboard.writeText(subUrl);
+                t.className = "show";
+                setTimeout(() => t.className = "", 3000);
+            } catch (err) {
+                const el = document.createElement('textarea');
+                el.value = subUrl;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                t.className = "show";
+                setTimeout(() => t.className = "", 3000);
+            }
+        };
+
+        // Логика быстрого импорта
+        document.getElementById('importBtn').onclick = () => {
+            const app = appsData[currentOS][currentAppIdx];
+            window.location.href = `${app.scheme}://install-config?url=${encodeURIComponent(subUrl)}`;
+        };
+
+        // Автоопределение устройства при загрузке страницы
+        window.onload = () => {
+            const ua = navigator.userAgent.toLowerCase();
+            if (ua.includes("win")) currentOS = "windows";
+            else if (ua.includes("mac") && !('ontouchend' in document)) currentOS = "macos";
+            else if (ua.includes("android")) currentOS = "android";
+            else currentOS = "ios";
+
+            document.getElementById('os-selector').value = currentOS;
+            render();
+        };
+    </script>
+</body>
+</html>

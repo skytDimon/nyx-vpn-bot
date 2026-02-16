@@ -41,14 +41,15 @@ def tariffs_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def payments_keyboard() -> InlineKeyboardMarkup:
+def payments_keyboard(country: str = "fi") -> InlineKeyboardMarkup:
     support_text = "привет хочу купить подписку на впн"
     support_url = f"https://t.me/SkytNinja?text={quote(support_text)}"
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="💳 Оплатить с баланса", callback_data="pay:balance"
+                    text="💳 Оплатить с баланса",
+                    callback_data=f"pay:balance:{country}",
                 )
             ],
             [InlineKeyboardButton(text="🏦 Оплатить через РФ банк", url=support_url)],
@@ -69,6 +70,14 @@ def balance_payments_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="back:balance")],
+        ]
+    )
+
+
+def subscription_check_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Я подписался", callback_data="check:sub")]
         ]
     )
 
@@ -96,6 +105,7 @@ def countries_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🇫🇮 Finland", callback_data="country:fi")],
+            [InlineKeyboardButton(text="🇳🇱 Netherlands", callback_data="country:nl")],
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="back:tariffs")],
         ]
     )

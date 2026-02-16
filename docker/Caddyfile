@@ -1,0 +1,16 @@
+nyxvpnnl.home.kg {
+  encode zstd gzip
+
+  handle /sub/* {
+    uri replace /sub/ /FavEHtFTSm8CcE6wN3/sub/
+    reverse_proxy https://nyxvpnnl.home.kg:15499 {
+      transport http {
+        tls_insecure_skip_verify
+      }
+    }
+  }
+
+  handle {
+    reverse_proxy sub:8002
+  }
+}
