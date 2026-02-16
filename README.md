@@ -113,7 +113,7 @@ docker compose -f docker/docker-compose.yml exec bot python -m app.broadcast "В
 
 ## Домен подписок
 - Для `nyxvpnnl.home.kg` нужен A‑запись на IP сервера.
-- Caddy автоматически получит TLS сертификат.
+- Если 80/443 заняты, используйте `https://nyxvpnnl.home.kg:8443`.
 - Лендинг и новые ссылки используются только для Netherlands.
 
 ## Примечания
