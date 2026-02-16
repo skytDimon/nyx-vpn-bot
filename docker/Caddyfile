@@ -1,4 +1,5 @@
-nyxvpnnl.home.kg {
+nyxvpnnl.home.kg:8443 {
+  tls internal
   encode zstd gzip
 
   handle /sub/* {
