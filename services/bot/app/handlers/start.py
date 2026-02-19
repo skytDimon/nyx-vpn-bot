@@ -11,6 +11,7 @@ from aiogram.types import CallbackQuery, FSInputFile, Message
 from app.keyboards.menu import (
     balance_keyboard,
     balance_payments_keyboard,
+    connect_keyboard,
     countries_keyboard,
     main_menu_keyboard,
     personal_cabinet_keyboard,
@@ -35,7 +36,7 @@ from app.storage import (
     set_subscription,
 )
 from app.vpn_instructions import vpn_instructions
-from app.config import get_required_channel_id, get_sub_landing_base, get_xui_settings
+from app.config import get_miniapp_url, get_xui_settings
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -285,13 +286,13 @@ async def trial_tariff(callback: CallbackQuery):
             callback.from_user.id,
             FSInputFile(str(link_image)),
             caption=instructions,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=connect_keyboard(get_miniapp_url()),
         )
     else:
         await callback.bot.send_message(
             callback.from_user.id,
             instructions,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=connect_keyboard(get_miniapp_url()),
             disable_web_page_preview=True,
         )
 
@@ -352,13 +353,7 @@ async def pay_handler(callback: CallbackQuery):
         return
     finally:
         await xui.close()
-    landing_base = get_sub_landing_base(country)
-    if country == "nl" and landing_base:
-        landing_link = f"{landing_base}/{sub_id}"
-        instructions = vpn_instructions(landing_link, landing=True)
-        sub_link = landing_link
-    else:
-        instructions = vpn_instructions(sub_link)
+    instructions = vpn_instructions(sub_link)
     link_image = Path(__file__).resolve().parents[2] / "img" / "link.png"
     if link_image.exists():
         await callback.bot.send_photo(
@@ -404,22 +399,10 @@ async def _personal_cabinet_text(user) -> tuple[str, bool]:
         return "❌ Подписка не активна", False
     subscription_link, instructions = get_vpn_data(user.id)
     if xui_available and xui_link:
-        if country == "nl":
-            landing_base = get_sub_landing_base("nl")
-            if landing_base:
-                subscription_link = f"{landing_base}/{xui_link.split('/')[-1]}"
-                instructions = vpn_instructions(subscription_link, landing=True)
-            else:
-                subscription_link = xui_link
-                instructions = vpn_instructions(xui_link)
-        else:
-            subscription_link = xui_link
-            instructions = vpn_instructions(xui_link)
+        subscription_link = xui_link
+        instructions = vpn_instructions(xui_link)
     elif subscription_link and not instructions:
-        if country == "nl":
-            instructions = vpn_instructions(subscription_link, landing=True)
-        else:
-            instructions = vpn_instructions(subscription_link)
+        instructions = vpn_instructions(subscription_link)
 
     end_at = xui_end_at
     if not end_at:
@@ -485,19 +468,6 @@ async def choose_country(callback: CallbackQuery):
     else:
         await callback.message.edit_text(text, reply_markup=payments_keyboard(code))
     await callback.answer()
-
-
-@router.callback_query(F.data == "check:sub")
-async def check_subscription(callback: CallbackQuery):
-    channel_id = get_required_channel_id()
-    try:
-        member = await callback.bot.get_chat_member(channel_id, callback.from_user.id)
-        if member.status in {"member", "administrator", "creator"}:
-            await callback.answer("✅ Подписка подтверждена", show_alert=True)
-            return
-    except Exception:
-        pass
-    await callback.answer("⚠️ Подписка не найдена", show_alert=True)
 
 
 @router.callback_query(F.data == "balance:topup")

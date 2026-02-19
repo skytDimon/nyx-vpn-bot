@@ -5,8 +5,6 @@ from aiogram.types import BotCommand
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.config import get_bot_token
-from app.config import get_required_channel_id
-from app.middleware.required_channel import RequireChannelMiddleware
 from app.notifications import notify_subscriptions
 from app.preflight import run_preflight
 from app.storage import init_db, purge_expired_subscriptions
@@ -34,8 +32,6 @@ async def main():
         ]
     )
     dp = Dispatcher()
-    dp.message.middleware(RequireChannelMiddleware(get_required_channel_id()))
-    dp.callback_query.middleware(RequireChannelMiddleware(get_required_channel_id()))
     dp.include_router(start.router)
     dp.include_router(subscription.router)
     dp.include_router(payments.router)

@@ -7,8 +7,6 @@ MVP реализация Telegram‑бота для продажи VPN‑дос�
 - `admin` — админ‑панель управления пользователями (запускается отдельно, не в Docker)
 - `db` — PostgreSQL
 - `redis` — кэш подписок и уведомления
-- `sub` — FastAPI лендинг для подписок
-- `caddy` — TLS и reverse proxy (лендинг + XUI)
 
 ## Требования
 - Python 3.12
@@ -38,9 +36,6 @@ docker compose -f docker/docker-compose.yml ps
 
 # Логи бота
 docker compose -f docker/docker-compose.yml logs -f bot
-
-# Логи лендинга
-docker compose -f docker/docker-compose.yml logs -f sub
 
 # Остановка
 docker compose -f docker/docker-compose.yml down
@@ -86,8 +81,6 @@ PYTHONPATH=. uvicorn app.main:app --reload --port 8001
 - `CRYPTOBOT_TOKEN`
 - `PAYMENTS_ENABLED`
 - `REDIS_URL`
-- `SUB_PUBLIC_BASE` (используется лендингом)
-- `SUB_LANDING_BASE` (опционально, для Finland)
 - `XUI_URL` (Finland)
 - `XUI_USERNAME` (Finland)
 - `XUI_PASSWORD` (Finland)
@@ -98,23 +91,14 @@ PYTHONPATH=. uvicorn app.main:app --reload --port 8001
 - `NL_XUI_PASSWORD` (Netherlands)
 - `NL_XUI_INBOUND_ID` (Netherlands)
 - `NL_XUI_SUB_URL` (Netherlands)
-- `NL_SUB_PUBLIC_BASE` (Netherlands)
-- `NL_SUB_LANDING_BASE` (Netherlands)
 
 ## Команды обслуживания
 
 ```bash
-# Обновить ссылки активных подписок (только Netherlands)
-docker compose -f docker/docker-compose.yml exec bot python -m app.migrate_sub_links
-
 # Рассылка всем пользователям
 docker compose -f docker/docker-compose.yml exec bot python -m app.broadcast "Ваш текст"
 ```
 
-## Домен подписок
-- Для `nyxvpnnl.home.kg` нужен A‑запись на IP сервера.
-- Если 80/443 заняты, используйте `https://nyxvpnnl.home.kg:8443`.
-- Лендинг и новые ссылки используются только для Netherlands.
 
 ## Примечания
 - Оплаты по Stars и CryptoBot требуют настройки вебхуков (в текущей версии отключены).

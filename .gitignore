@@ -7,3 +7,4 @@ env/
 services/bot/bot.db
 .ruff_cache/
 .idea/
+.venv/

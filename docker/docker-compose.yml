@@ -6,7 +6,7 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,27 +36,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  sub:
-    build:
-      context: ../services/sub
-    env_file:
-      - ../.env
-    restart: unless-stopped
-
-  caddy:
-    image: caddy:2
-    ports:
-      - "8443:443"
-    volumes:
-      - ../docker/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - sub
-    restart: unless-stopped
 
 volumes:
   pg_data:
   redis_data:
-  caddy_data:
-  caddy_config:

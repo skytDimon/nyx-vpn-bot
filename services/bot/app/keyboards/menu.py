@@ -5,6 +5,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
+    WebAppInfo,
 )
 
 
@@ -74,10 +75,10 @@ def balance_payments_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def subscription_check_keyboard() -> InlineKeyboardMarkup:
+def connect_keyboard(url: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Я подписался", callback_data="check:sub")]
+            [InlineKeyboardButton(text="🔌 Подключиться", web_app=WebAppInfo(url=url))]
         ]
     )
 

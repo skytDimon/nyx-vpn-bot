@@ -65,36 +65,7 @@ def get_xui_settings(country: str = "fi") -> XuiSettings:
     )
 
 
-def get_sub_public_base(country: str = "fi") -> str:
+def get_miniapp_url() -> str:
     load_env()
-    prefix = "NL_" if country == "nl" else ""
-    base = os.getenv(f"{prefix}SUB_PUBLIC_BASE")
-    if base:
-        return base.rstrip("/")
-    sub_url = os.getenv(f"{prefix}XUI_SUB_URL")
-    if sub_url:
-        return f"{sub_url.rstrip('/')}/sub"
-    raise RuntimeError("SUB_PUBLIC_BASE or XUI_SUB_URL is not set")
-
-
-def get_sub_landing_base(country: str = "fi") -> str | None:
-    load_env()
-    prefix = "NL_" if country == "nl" else ""
-    base = os.getenv(f"{prefix}SUB_LANDING_BASE")
-    if not base:
-        return None
-    return base.rstrip("/")
-
-
-def get_required_channel_id() -> int:
-    load_env()
-    value = os.getenv("REQUIRED_CHANNEL_ID", "-10038773344684")
-    return int(value)
-
-
-def get_required_channel_url() -> str | None:
-    load_env()
-    value = os.getenv("REQUIRED_CHANNEL_URL")
-    if not value:
-        return None
-    return value.strip()
+    value = os.getenv("MINIAPP_URL", "http://localhost:8010")
+    return value.rstrip("/")

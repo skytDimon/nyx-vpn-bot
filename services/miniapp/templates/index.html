@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NYX VPN — Подключение</title>
+    <title>NYX VPN Premium — Amber Edition</title>
     <!-- Подключение Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Подключение премиального шрифта -->
@@ -125,7 +125,7 @@
 
     <!-- Заголовок страницы -->
     <div class="mb-12 text-center">
-        <h2 class="nyx-premium-title text-[10px]">NYX VPN</h2>
+        <h2 class="nyx-premium-title text-[10px]">NYX Vpn Premium</h2>
     </div>
 
     <div class="max-w-md w-full main-card rounded-[3.5rem] p-8 md:p-12 overflow-hidden relative">
@@ -134,7 +134,7 @@
 
         <!-- Шапка карточки -->
         <div class="flex items-center justify-between mb-12">
-            <h1 class="text-3xl font-black tracking-tight text-white">Подключение</h1>
+            <h1 class="text-3xl font-black tracking-tight text-white">Установка</h1>
             <select id="os-selector" class="custom-select text-[11px] outline-none cursor-pointer">
                 <option value="ios">iOS</option>
                 <option value="android">Android</option>
@@ -187,14 +187,14 @@
         <!-- Нижняя кнопка для ручного копирования -->
         <div class="mt-16 text-center">
             <button id="copyBtn" class="text-[9px] font-black uppercase tracking-[0.35em] text-zinc-700 hover:text-amber-500 transition-all">
-                Скопировать ссылку вручную
+                Copy Manual URL
             </button>
         </div>
     </div>
 
     <script>
         // Константа со ссылкой на вашу подписку
-        const subUrl = "{{ sub_url }}";
+        const subUrl = "vless://aDmvDLpef0WeyRun@sub.chezavpnep.mooo.com:443?security=tls&sni=sub.chezavpnep.mooo.com&type=grpc&serviceName=grpc#NYX-Premium";
 
         // Определения приложений
         const HAPP = { id: 'HAPP', name: 'Happ', scheme: 'happ' };
@@ -204,18 +204,20 @@
         // Данные по платформам
         const appsData = {
             ios: [
-                { ...HAPP, links: [{ text: 'App Store', url: 'https://apps.apple.com/ru/app/happ-proxy-privacy-vpn/id6449157023' }] },
-                { ...V2RAY, links: [{ text: 'App Store', url: 'https://apps.apple.com/ru/app/v2raytun/id6476628951' }] }
+                { ...HAPP, links: [{ text: 'App Store (RU)', url: 'https://apps.apple.com/ru/app/happ-proxy/id6444641723' }, { text: 'App Store (Global)', url: 'https://apps.apple.com/us/app/happ-proxy/id6444641723' }] },
+                { ...V2RAY, links: [{ text: 'App Store', url: 'https://apps.apple.com/app/v2raytun/id1645005021' }] }
             ],
             android: [
-                { ...HAPP, links: [{ text: 'Google Play', url: 'https://play.google.com/store/apps/details?id=com.happproxy' }] },
-                { ...V2RAY, links: [{ text: 'Google Play', url: 'https://play.google.com/store/apps/details?id=com.v2raytun.android' }] }
+                { ...HAPP, links: [{ text: 'Google Play', url: '#' }, { text: 'Download APK', url: '#' }] },
+                { ...V2RAY, links: [{ text: 'Direct Link', url: '#' }] }
             ],
             windows: [
-                { ...V2RAYN, links: [{ text: 'GitHub', url: 'https://github.com/v2rayN/v2rayN/releases' }] }
+                { ...V2RAYN, links: [{ text: 'GitHub Client', url: 'https://github.com/v2rayN/v2rayN/releases' }] },
+                { ...V2RAY, links: [{ text: 'Direct Download', url: '#' }] }
             ],
             macos: [
-                { ...HAPP, links: [{ text: 'Mac App Store', url: 'https://apps.apple.com/ru/app/happ-proxy-privacy-vpn/id6449157023' }] }
+                { ...HAPP, links: [{ text: 'Mac App Store', url: 'https://apps.apple.com/us/app/happ-proxy/id6444641723' }] },
+                { ...V2RAY, links: [{ text: 'GitHub DMG', url: '#' }] }
             ]
         };
 
@@ -268,22 +270,17 @@
         };
 
         // Логика копирования ссылки
-        document.getElementById('copyBtn').onclick = async () => {
+        document.getElementById('copyBtn').onclick = () => {
+            const el = document.createElement('textarea');
+            el.value = subUrl;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+
             const t = document.getElementById('toast');
-            try {
-                await navigator.clipboard.writeText(subUrl);
-                t.className = "show";
-                setTimeout(() => t.className = "", 3000);
-            } catch (err) {
-                const el = document.createElement('textarea');
-                el.value = subUrl;
-                document.body.appendChild(el);
-                el.select();
-                document.execCommand('copy');
-                document.body.removeChild(el);
-                t.className = "show";
-                setTimeout(() => t.className = "", 3000);
-            }
+            t.className = "show";
+            setTimeout(() => t.className = "", 3000);
         };
 
         // Логика быстрого импорта

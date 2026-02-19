@@ -439,6 +439,27 @@ def fetch_all_user_ids() -> list[int]:
             return [row[0] for row in cur.fetchall()]
 
 
+def fetch_users_with_subscription_links(
+    min_days: int = 3, max_days: int = 30
+) -> list[dict]:
+    with _connect() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT s.tg_id, s.subscription_link
+                FROM subscriptions s
+                WHERE s.subscription_link IS NOT NULL
+                  AND s.end_at IS NOT NULL
+                  AND s.start_at IS NOT NULL
+                  AND s.end_at > NOW()
+                  AND (s.end_at - s.start_at) >= (%s || ' days')::interval
+                  AND (s.end_at - s.start_at) < (%s || ' days')::interval
+                """,
+                (min_days, max_days),
+            )
+            return list(cur.fetchall())
+
+
 def _cache_key(tg_id: int) -> str:
     return f"subscription:{tg_id}"
 
