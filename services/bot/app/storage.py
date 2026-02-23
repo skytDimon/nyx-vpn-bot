@@ -284,7 +284,7 @@ def get_subscription(tg_id: int) -> tuple[datetime | None, datetime | None]:
                 end_at,
                 row["subscription_link"],
                 row["instructions"],
-                row.get("country") or "fi",
+                row.get("country") or "nl",
             )
             return start_at, end_at
 
@@ -321,7 +321,7 @@ def get_subscription_meta(tg_id: int) -> dict | None:
             "end_at": cached["end_at"],
             "subscription_link": cached["subscription_link"],
             "instructions": cached["instructions"],
-            "country": cached.get("country") or "fi",
+            "country": cached.get("country") or "nl",
         }
     with _connect() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -345,7 +345,7 @@ def get_subscription_meta(tg_id: int) -> dict | None:
                 row["end_at"],
                 row["subscription_link"],
                 row["instructions"],
-                row.get("country") or "fi",
+                row.get("country") or "nl",
             )
             return row
 
@@ -516,7 +516,7 @@ def _cache_get_subscription(tg_id: int) -> dict | None:
         "end_at": end_at,
         "subscription_link": data.get("subscription_link"),
         "instructions": data.get("instructions"),
-        "country": data.get("country") or "fi",
+        "country": data.get("country") or "nl",
     }
 
 

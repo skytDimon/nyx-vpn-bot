@@ -105,7 +105,6 @@ def setup_keyboard() -> InlineKeyboardMarkup:
 def countries_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🇫🇮 Finland", callback_data="country:fi")],
             [InlineKeyboardButton(text="🇳🇱 Netherlands", callback_data="country:nl")],
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="back:tariffs")],
         ]

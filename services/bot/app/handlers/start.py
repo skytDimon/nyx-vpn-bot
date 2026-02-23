@@ -261,7 +261,7 @@ async def trial_tariff(callback: CallbackQuery):
 
     username = callback.from_user.username or f"tg_{callback.from_user.id}"
     email = f"@{username}"
-    xui = XuiClient.from_env()
+    xui = XuiClient.from_settings(get_xui_settings("nl"))
     try:
         await xui.login()
         sub_id = await xui.add_client(email=email, days=TRIAL_DAYS)
@@ -304,7 +304,7 @@ async def trial_tariff(callback: CallbackQuery):
         end_at,
         sub_link,
         instructions,
-        "fi",
+        "nl",
     )
     await callback.message.answer(
         "🎉 Пробный период на 3 дня активирован.",
@@ -316,7 +316,7 @@ async def trial_tariff(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("pay:balance:"))
 async def pay_handler(callback: CallbackQuery):
     country = callback.data.split(":", 2)[2]
-    if country not in {"fi", "nl"}:
+    if country not in {"nl"}:
         await callback.answer()
         return
     ensure_user(callback.from_user.id, callback.from_user.username)
@@ -390,7 +390,7 @@ async def pay_handler(callback: CallbackQuery):
 async def _personal_cabinet_text(user) -> tuple[str, bool]:
     ensure_user(user.id, user.username)
     meta = get_subscription_meta(user.id)
-    country = "fi"
+    country = "nl"
     if meta and isinstance(meta.get("country"), str):
         country = meta["country"]
     xui_available, xui_link, xui_end_at = await _fetch_xui_subscription(user, country)
@@ -454,7 +454,6 @@ def _normalize_dt(value: datetime | None) -> datetime | None:
 @router.callback_query(F.data.startswith("country:"))
 async def choose_country(callback: CallbackQuery):
     country_map = {
-        "fi": "🇫🇮 Сервер Finland выбран.",
         "nl": "🇳🇱 Сервер Netherlands выбран.",
     }
     code = callback.data.split(":", 1)[1]

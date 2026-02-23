@@ -47,7 +47,7 @@ def get_redis_url() -> str:
     return os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 
-def get_xui_settings(country: str = "fi") -> XuiSettings:
+def get_xui_settings(country: str = "nl") -> XuiSettings:
     load_env()
     prefix = "NL_" if country == "nl" else ""
     base_url = _require(f"{prefix}XUI_URL")
