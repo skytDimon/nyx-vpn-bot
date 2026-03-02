@@ -281,20 +281,23 @@ async def trial_tariff(callback: CallbackQuery):
 
     instructions = vpn_instructions(sub_link)
     link_image = Path(__file__).resolve().parents[2] / "img" / "link.png"
-    if link_image.exists():
-        await callback.bot.send_photo(
-            callback.from_user.id,
-            FSInputFile(str(link_image)),
-            caption=instructions,
-            reply_markup=main_menu_keyboard(),
-        )
-    else:
-        await callback.bot.send_message(
-            callback.from_user.id,
-            instructions,
-            reply_markup=main_menu_keyboard(),
-            disable_web_page_preview=True,
-        )
+    try:
+        if link_image.exists():
+            await callback.bot.send_photo(
+                callback.from_user.id,
+                FSInputFile(str(link_image)),
+                caption=instructions,
+                reply_markup=main_menu_keyboard(),
+            )
+        else:
+            await callback.bot.send_message(
+                callback.from_user.id,
+                instructions,
+                reply_markup=main_menu_keyboard(),
+                disable_web_page_preview=True,
+            )
+    except Exception:
+        logger.exception("Trial send failed for tg_id=%s", callback.from_user.id)
 
     start_at = datetime.now(timezone.utc)
     end_at = start_at + timedelta(days=TRIAL_DAYS)
