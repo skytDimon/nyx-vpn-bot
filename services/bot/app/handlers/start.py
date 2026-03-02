@@ -246,7 +246,7 @@ async def connect_tariff(callback: CallbackQuery):
 @router.callback_query(F.data == "tariff:trial")
 async def trial_tariff(callback: CallbackQuery):
     ensure_user(callback.from_user.id, callback.from_user.username)
-    _, _, xui_end_at = await _fetch_xui_subscription(callback.from_user, "fi")
+    _, _, xui_end_at = await _fetch_xui_subscription(callback.from_user, "nl")
     end_at = xui_end_at
     if not end_at:
         _, end_at = get_subscription(callback.from_user.id)
@@ -286,13 +286,13 @@ async def trial_tariff(callback: CallbackQuery):
             callback.from_user.id,
             FSInputFile(str(link_image)),
             caption=instructions,
-            reply_markup=connect_keyboard(get_miniapp_url()),
+            reply_markup=main_menu_keyboard(),
         )
     else:
         await callback.bot.send_message(
             callback.from_user.id,
             instructions,
-            reply_markup=connect_keyboard(get_miniapp_url()),
+            reply_markup=main_menu_keyboard(),
             disable_web_page_preview=True,
         )
 
