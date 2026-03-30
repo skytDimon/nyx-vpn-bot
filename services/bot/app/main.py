@@ -29,6 +29,7 @@ async def main():
             BotCommand(command="start", description="Start"),
             BotCommand(command="help", description="Help"),
             BotCommand(command="info", description="Info"),
+            BotCommand(command="my_vpn", description="Мой VPN"),
         ]
     )
     dp = Dispatcher()

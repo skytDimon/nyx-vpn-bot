@@ -130,3 +130,11 @@ def payment_keyboard(plan_id: str) -> InlineKeyboardMarkup:
             ],
         ]
     )
+
+
+def my_vpn_keyboard(url: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔐 Открыть мой VPN", url=url)],
+        ]
+    )

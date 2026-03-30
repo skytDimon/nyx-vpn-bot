@@ -1,0 +1,12 @@
+server {
+    listen 15497 ssl http2;
+    server_name nyxvpnnl.home.kg;
+
+    ssl_certificate /root/cert/nyxvpnnl.home.kg/fullchain.pem;
+    ssl_certificate_key /root/cert/nyxvpnnl.home.kg/privkey.pem;
+
+    location / {
+        root /var/www/nyxvpn;
+        index index.html;
+    }
+}

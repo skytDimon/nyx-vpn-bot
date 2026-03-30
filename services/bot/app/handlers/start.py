@@ -14,6 +14,7 @@ from app.keyboards.menu import (
     connect_keyboard,
     countries_keyboard,
     main_menu_keyboard,
+    my_vpn_keyboard,
     personal_cabinet_keyboard,
     payments_keyboard,
     setup_keyboard,
@@ -37,6 +38,7 @@ from app.storage import (
 )
 from app.vpn_instructions import vpn_instructions
 from app.config import get_miniapp_url, get_xui_settings
+from app.services.xui_db import get_subscription_link
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -575,3 +577,31 @@ async def back_to_countries(callback: CallbackQuery):
     else:
         await callback.message.edit_text(text, reply_markup=countries_keyboard())
     await callback.answer()
+
+
+@router.message(Command("my_vpn"))
+async def my_vpn_handler(message: Message):
+    """Look up the user's VPN subscription in the 3x-ui database."""
+    username = message.from_user.username
+    if not username:
+        await message.answer(
+            "⚠️ У вас не задан Telegram username. "
+            "Установите его в настройках профиля и попробуйте снова.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    link = await get_subscription_link(username)
+    if not link:
+        await message.answer(
+            "❌ Подписка не найдена.\n"
+            "Убедитесь, что вы приобрели VPN, или обратитесь в поддержку.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    await message.answer(
+        "🔐 Ваша VPN-подписка найдена!\n"
+        "Нажмите кнопку ниже, чтобы открыть страницу подключения.",
+        reply_markup=my_vpn_keyboard(link),
+    )

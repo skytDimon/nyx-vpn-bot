@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYX VPN — Персональный доступ в свободный интернет</title>
+    <meta name="description" content="NYX VPN — быстрый и безопасный VPN-сервис. Подключись к свободному интернету за 3 простых шага.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #09090b;
+            --bg-secondary: #111114;
+            --bg-card: #16161a;
+            --bg-card-hover: #1c1c22;
+            --border-color: #222228;
+            --border-glow: rgba(180, 180, 195, 0.25);
+            --text-primary: #f0f0f5;
+            --text-secondary: #8b8b9e;
+            --text-muted: #55556a;
+            --accent-blue: #b0b0c0;
+            --accent-blue-light: #d0d0dd;
+            --accent-purple: #888898;
+            --accent-purple-light: #a0a0b0;
+            --gradient-main: linear-gradient(135deg, #e0e0e8, #707080);
+            --gradient-glow: linear-gradient(135deg, rgba(200,200,215,0.12), rgba(140,140,160,0.12));
+            --gradient-subtle: linear-gradient(180deg, rgba(180,180,195,0.06) 0%, transparent 100%);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-xs: 8px;
+            --shadow-card: 0 4px 24px rgba(0,0,0,0.3);
+            --shadow-glow: 0 0 40px rgba(180,180,195,0.08);
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Background ambient glow */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -200px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 600px;
+            background: radial-gradient(ellipse, rgba(180,180,195,0.06) 0%, rgba(140,140,160,0.03) 40%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 0 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: rgba(9, 9, 11, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 100;
+        }
+
+        .header .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--gradient-main);
+            border-radius: var(--radius-xs);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px rgba(180,180,195,0.2);
+        }
+
+        .logo-icon i {
+            color: white;
+            width: 20px;
+            height: 20px;
+        }
+
+        .logo-text {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            background: var(--gradient-main);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .server-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.15);
+            padding: 6px 14px;
+            border-radius: 100px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(34,197,94,0.6);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { box-shadow: 0 0 8px rgba(34,197,94,0.6); }
+            50% { box-shadow: 0 0 16px rgba(34,197,94,0.9); }
+        }
+
+        .status-text {
+            color: #4ade80;
+        }
+
+        /* ===== HERO ===== */
+        .hero {
+            padding: 80px 0 60px;
+            text-align: center;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--accent-blue-light);
+            background: rgba(180,180,195,0.08);
+            border: 1px solid rgba(180,180,195,0.15);
+            padding: 6px 16px;
+            border-radius: 100px;
+            margin-bottom: 28px;
+        }
+
+        .hero h1 {
+            font-size: clamp(28px, 5vw, 44px);
+            font-weight: 600;
+            line-height: 1.15;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
+        }
+
+        .hero h1 span {
+            background: var(--gradient-main);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-sub {
+            font-size: 16px;
+            color: var(--text-secondary);
+            max-width: 500px;
+            margin: 0 auto 36px;
+        }
+
+        /* Subscription ID Box */
+        .sub-box {
+            max-width: 520px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            box-shadow: var(--shadow-card), var(--shadow-glow);
+        }
+
+        .sub-box-label {
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .sub-box-id {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            transition: border-color var(--transition);
+        }
+
+        .sub-box-id:hover {
+            border-color: var(--border-glow);
+        }
+
+        .sub-box-id i {
+            color: var(--accent-blue);
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .sub-id-value {
+            font-size: 14px;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            color: var(--text-primary);
+            word-break: break-all;
+            flex: 1;
+            text-align: left;
+        }
+
+        .copy-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 6px;
+            border-radius: 6px;
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .copy-btn:hover {
+            color: var(--accent-blue-light);
+            background: rgba(180,180,195,0.1);
+        }
+
+        .copy-btn.copied {
+            color: #22c55e;
+        }
+
+        .copy-btn i {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* ===== CARDS GRID ===== */
+        .section-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .section-sub {
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+        }
+
+        .devices-section {
+            padding: 40px 0 60px;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .cards-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+        }
+
+        .device-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            transition: all var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .device-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--gradient-main);
+            opacity: 0;
+            transition: opacity var(--transition);
+        }
+
+        .device-card:hover {
+            border-color: var(--border-glow);
+            background: var(--bg-card-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-card), 0 0 30px rgba(180,180,195,0.06);
+        }
+
+        .device-card:hover::before {
+            opacity: 1;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--gradient-glow);
+            border: 1px solid rgba(180,180,195,0.15);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .card-icon i {
+            color: var(--accent-blue-light);
+            width: 24px;
+            height: 24px;
+        }
+
+        .card-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .card-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .card-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn-app {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
+            cursor: pointer;
+            transition: all var(--transition);
+            text-decoration: none;
+            width: 100%;
+        }
+
+        .btn-app i {
+            width: 18px;
+            height: 18px;
+            color: var(--accent-blue);
+            flex-shrink: 0;
+        }
+
+        .btn-app .btn-label {
+            flex: 1;
+            text-align: left;
+        }
+
+        .btn-app .btn-arrow {
+            color: var(--text-muted);
+            transition: all var(--transition);
+        }
+
+        .btn-app .btn-arrow i {
+            width: 14px;
+            height: 14px;
+            color: inherit;
+        }
+
+        .btn-app:hover {
+            border-color: var(--accent-blue);
+            background: rgba(180,180,195,0.06);
+        }
+
+        .btn-app:hover .btn-arrow {
+            color: var(--accent-blue-light);
+            transform: translateX(2px);
+        }
+
+        .btn-download {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border-radius: var(--radius-xs);
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 500;
+            font-family: 'Space Grotesk', sans-serif;
+            cursor: pointer;
+            transition: all var(--transition);
+            text-decoration: none;
+        }
+
+        .btn-download i {
+            width: 14px;
+            height: 14px;
+        }
+
+        .btn-download:hover {
+            color: var(--accent-blue-light);
+        }
+
+        /* ===== STEPS ===== */
+        .steps-section {
+            padding: 60px 0;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .steps-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        .step-item {
+            text-align: center;
+            padding: 32px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            position: relative;
+            transition: all var(--transition);
+        }
+
+        .step-item:hover {
+            border-color: var(--border-glow);
+            transform: translateY(-2px);
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-main);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            margin: 0 auto 16px;
+            box-shadow: 0 0 20px rgba(180,180,195,0.2);
+        }
+
+        .step-icon {
+            margin-bottom: 8px;
+        }
+
+        .step-icon i {
+            width: 28px;
+            height: 28px;
+            color: var(--accent-blue-light);
+        }
+
+        .step-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .step-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            padding: 40px 0 60px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .support-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 32px;
+            background: var(--gradient-main);
+            color: white;
+            border: none;
+            border-radius: 100px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all var(--transition);
+            box-shadow: 0 4px 20px rgba(180,180,195,0.2);
+        }
+
+        .support-btn i {
+            width: 20px;
+            height: 20px;
+        }
+
+        .support-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(180,180,195,0.3);
+        }
+
+        .footer-note {
+            margin-top: 20px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-in {
+            animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            opacity: 0;
+        }
+
+        .animate-in:nth-child(1) { animation-delay: 0.05s; }
+        .animate-in:nth-child(2) { animation-delay: 0.1s; }
+        .animate-in:nth-child(3) { animation-delay: 0.15s; }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 12px 24px;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 500;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast i {
+            width: 16px;
+            height: 16px;
+            color: #22c55e;
+        }
+
+        /* No-ID warning */
+        .no-id-warning {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            font-size: 13px;
+            padding: 10px 16px;
+            border-radius: var(--radius-xs);
+            margin-top: 12px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .no-id-warning i {
+            width: 16px;
+            height: 16px;
+            color: #f87171;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <a href="#" class="logo">
+                <span class="logo-text">NYX VPN</span>
+            </a>
+            <div class="server-status">
+                <span class="status-dot"></span>
+                <span class="status-text">Online</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-badge">
+                <i data-lucide="zap" style="width:14px;height:14px;"></i>
+                Быстро и безопасно
+            </div>
+            <h1>Твой персональный доступ<br>в <span>свободный интернет</span></h1>
+            <p class="hero-sub">Подключись к NYX VPN в пару нажатий. Выбери своё устройство и приложение ниже.</p>
+
+            <div class="sub-box">
+                <div class="sub-box-label">Твой ID подписки</div>
+                <div class="sub-box-id">
+                    <i data-lucide="key-round"></i>
+                    <span class="sub-id-value" id="subscriptionId">—</span>
+                    <button class="copy-btn" id="copyBtn" onclick="copySubscriptionUrl()" title="Скопировать ссылку подписки">
+                        <i data-lucide="copy"></i>
+                    </button>
+                </div>
+                <div class="no-id-warning" id="noIdWarning">
+                    <i data-lucide="alert-circle"></i>
+                    <span>ID подписки не найден. Убедитесь, что ссылка содержит параметр <strong>?id=...</strong></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Devices Grid -->
+    <section class="devices-section">
+        <div class="container">
+            <h2 class="section-title">Выбери своё устройство</h2>
+            <p class="section-sub">Нажми «Подключить», чтобы автоматически импортировать подписку</p>
+
+            <div class="cards-grid">
+                <!-- iOS -->
+                <div class="device-card animate-in">
+                    <div class="card-icon">
+                        <i data-lucide="smartphone"></i>
+                    </div>
+                    <div class="card-title">iOS</div>
+                    <div class="card-subtitle">iPhone & iPad</div>
+                    <div class="card-buttons">
+                        <a href="#" class="btn-app" id="btn-streisand" onclick="connectApp('streisand'); return false;">
+                            <i data-lucide="download"></i>
+                            <span class="btn-label">Подключить в Streisand</span>
+                            <span class="btn-arrow"><i data-lucide="chevron-right"></i></span>
+                        </a>
+                        <a href="#" class="btn-app" id="btn-v2raytun" onclick="connectApp('v2raytun'); return false;">
+                            <i data-lucide="download"></i>
+                            <span class="btn-label">Подключить в V2RayTun</span>
+                            <span class="btn-arrow"><i data-lucide="chevron-right"></i></span>
+                        </a>
+                        <a href="#" class="btn-app" id="btn-happ-ios" onclick="connectApp('happ'); return false;">
+                            <i data-lucide="download"></i>
+                            <span class="btn-label">Подключить в Happ</span>
+                            <span class="btn-arrow"><i data-lucide="chevron-right"></i></span>
+                        </a>
+                        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px;">
+                            <a href="https://apps.apple.com/app/streisand/id6450534064" target="_blank" rel="noopener" class="btn-download">
+                                <i data-lucide="external-link"></i> Скачать Streisand
+                            </a>
+                            <a href="https://apps.apple.com/app/v2raytun/id6476628951" target="_blank" rel="noopener" class="btn-download">
+                                <i data-lucide="external-link"></i> Скачать V2RayTun
+                            </a>
+                            <a href="https://apps.apple.com/app/happ/id6504287215" target="_blank" rel="noopener" class="btn-download">
+                                <i data-lucide="external-link"></i> Скачать Happ
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Android -->
+                <div class="device-card animate-in">
+                    <div class="card-icon">
+                        <i data-lucide="smartphone"></i>
+                    </div>
+                    <div class="card-title">Android</div>
+                    <div class="card-subtitle">Смартфоны и планшеты</div>
+                    <div class="card-buttons">
+                        <a href="#" class="btn-app" id="btn-v2rayng" onclick="connectApp('v2rayng'); return false;">
+                            <i data-lucide="download"></i>
+                            <span class="btn-label">Подключить в v2rayNG</span>
+                            <span class="btn-arrow"><i data-lucide="chevron-right"></i></span>
+                        </a>
+                        <a href="#" class="btn-app" id="btn-hiddify" onclick="connectApp('hiddify'); return false;">
+                            <i data-lucide="download"></i>
+                            <span class="btn-label">Подключить в Hiddify</span>
+                            <span class="btn-arrow"><i data-lucide="chevron-right"></i></span>
+                        </a>
+                        <a href="#" class="btn-app" id="btn-happ-android" onclick="connectApp('happ'); return false;">
+                            <i data-lucide="download"></i>
+                            <span class="btn-label">Подключить в Happ</span>
+                            <span class="btn-arrow"><i data-lucide="chevron-right"></i></span>
+                        </a>
+                        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px;">
+                            <a href="https://play.google.com/store/apps/details?id=com.v2ray.ang" target="_blank" rel="noopener" class="btn-download">
+                                <i data-lucide="external-link"></i> Скачать v2rayNG
+                            </a>
+                            <a href="https://play.google.com/store/apps/details?id=app.hiddify.com" target="_blank" rel="noopener" class="btn-download">
+                                <i data-lucide="external-link"></i> Скачать Hiddify
+                            </a>
+                            <a href="https://play.google.com/store/apps/details?id=com.happproxy.app" target="_blank" rel="noopener" class="btn-download">
+                                <i data-lucide="external-link"></i> Скачать Happ
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Desktop -->
+                <div class="device-card animate-in">
+                    <div class="card-icon">
+                        <i data-lucide="monitor"></i>
+                    </div>
+                    <div class="card-title">Windows / Mac</div>
+                    <div class="card-subtitle">Десктоп-приложения</div>
+                    <div class="card-buttons">
+                        <a href="#" class="btn-app" id="btn-nekoray" onclick="connectApp('nekoray'); return false;">
+                            <i data-lucide="download"></i>
+                            <span class="btn-label">Подключить в Nekoray</span>
+                            <span class="btn-arrow"><i data-lucide="chevron-right"></i></span>
+                        </a>
+                        <a href="#" class="btn-app" id="btn-v2raydesktop" onclick="connectApp('v2raydesktop'); return false;">
+                            <i data-lucide="download"></i>
+                            <span class="btn-label">Подключить в V2Ray Desktop</span>
+                            <span class="btn-arrow"><i data-lucide="chevron-right"></i></span>
+                        </a>
+                        <a href="#" class="btn-app" id="btn-happ-desktop" onclick="connectApp('happ'); return false;">
+                            <i data-lucide="download"></i>
+                            <span class="btn-label">Подключить в Happ</span>
+                            <span class="btn-arrow"><i data-lucide="chevron-right"></i></span>
+                        </a>
+                        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px;">
+                            <a href="https://github.com/MatsuriDayo/nekoray/releases" target="_blank" rel="noopener" class="btn-download">
+                                <i data-lucide="external-link"></i> Скачать Nekoray
+                            </a>
+                            <a href="https://github.com/nicedayzhu/v2rayN/releases" target="_blank" rel="noopener" class="btn-download">
+                                <i data-lucide="external-link"></i> Скачать V2Ray Desktop
+                            </a>
+                            <a href="https://github.com/nicedayzhu/v2rayN/releases" target="_blank" rel="noopener" class="btn-download">
+                                <i data-lucide="external-link"></i> Скачать Happ
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Steps -->
+    <section class="steps-section">
+        <div class="container">
+            <h2 class="section-title">Подключение за 3 шага</h2>
+            <p class="section-sub">Всё просто — справится каждый</p>
+
+            <div class="steps-grid">
+                <div class="step-item animate-in">
+                    <div class="step-number">1</div>
+                    <div class="step-icon"><i data-lucide="download"></i></div>
+                    <div class="step-title">Скачай приложение</div>
+                    <div class="step-desc">Установи одно из приложений для своего устройства</div>
+                </div>
+                <div class="step-item animate-in">
+                    <div class="step-number">2</div>
+                    <div class="step-icon"><i data-lucide="clipboard-copy"></i></div>
+                    <div class="step-title">Подключи подписку</div>
+                    <div class="step-desc">Нажми «Подключить» или скопируй ID подписки вручную</div>
+                </div>
+                <div class="step-item animate-in">
+                    <div class="step-number">3</div>
+                    <div class="step-icon"><i data-lucide="globe"></i></div>
+                    <div class="step-title">Наслаждайся</div>
+                    <div class="step-desc">Свободный интернет без ограничений — в одно нажатие</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <a href="https://t.me/nyxsupportvpn?text=%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82!%20%D0%AF%20%D0%BF%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8C%20nyx-vpn" target="_blank" rel="noopener" class="support-btn">
+                <i data-lucide="message-circle"></i>
+                Связаться с поддержкой
+            </a>
+            <p class="footer-note">NYX VPN © 2025. Безопасность и свобода в каждом соединении.</p>
+        </div>
+    </footer>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast">
+        <i data-lucide="check-circle-2"></i>
+        <span id="toastText">Скопировано!</span>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Get subscription ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const subId = urlParams.get('id');
+        const subscriptionIdEl = document.getElementById('subscriptionId');
+        const noIdWarning = document.getElementById('noIdWarning');
+
+        if (subId) {
+            subscriptionIdEl.textContent = subId;
+        } else {
+            subscriptionIdEl.textContent = 'ID не найден';
+            subscriptionIdEl.style.color = 'var(--text-muted)';
+            noIdWarning.style.display = 'flex';
+        }
+
+        // Build subscription URL
+        function getSubscriptionUrl() {
+            return `https://nyxvpnnl.home.kg:15499/sub/${subId}`;
+        }
+
+        // Copy subscription URL
+        function copySubscriptionUrl() {
+            if (!subId) {
+                showToast('ID подписки не найден');
+                return;
+            }
+            const url = getSubscriptionUrl();
+            navigator.clipboard.writeText(url).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.classList.add('copied');
+                showToast('Ссылка подписки скопирована!');
+                setTimeout(() => btn.classList.remove('copied'), 2000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = url;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast('Ссылка подписки скопирована!');
+            });
+        }
+
+        // Connect to app via protocol link
+        function connectApp(app) {
+            if (!subId) {
+                showToast('Сначала укажи ID подписки в URL');
+                return;
+            }
+
+            const subUrl = getSubscriptionUrl();
+            const encodedUrl = encodeURIComponent(subUrl);
+            let protocolLink = '';
+
+            switch (app) {
+                // iOS
+                case 'streisand':
+                    protocolLink = `streisand://import/${subUrl}`;
+                    break;
+                case 'v2raytun':
+                    protocolLink = `v2raytun://import/${subUrl}`;
+                    break;
+                // Android
+                case 'v2rayng':
+                    protocolLink = `v2rayng://install-sub?url=${encodedUrl}`;
+                    break;
+                case 'hiddify':
+                    protocolLink = `hiddify://import/${subUrl}`;
+                    break;
+                // Desktop
+                case 'nekoray':
+                    protocolLink = `nekoray://import/${subUrl}`;
+                    break;
+                case 'v2raydesktop':
+                    protocolLink = `v2rayn://install-sub?url=${encodedUrl}`;
+                    break;
+                // Happ (all platforms)
+                case 'happ':
+                    protocolLink = `happ://import/${subUrl}`;
+                    break;
+            }
+
+            if (protocolLink) {
+                window.location.href = protocolLink;
+                showToast('Открываю приложение…');
+            }
+        }
+
+        // Toast
+        let toastTimeout;
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            const toastText = document.getElementById('toastText');
+            toastText.textContent = text;
+            toast.classList.add('show');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2500);
+        }
+
+        // Intersection Observer for scroll animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.animationPlayState = 'running';
+                }
+            });
+        }, { threshold: 0.15 });
+
+        document.querySelectorAll('.animate-in').forEach(el => {
+            el.style.animationPlayState = 'paused';
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
