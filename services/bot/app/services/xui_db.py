@@ -11,7 +11,7 @@ from functools import partial
 logger = logging.getLogger(__name__)
 
 XUI_DB_PATH = "/etc/x-ui/x-ui.db"
-SUB_PAGE_URL = "https://nyxvpnnl.home.kg/index.html"
+SUB_PAGE_URL = "https://nyxvpnnl.home.kg:15497/index.html"
 
 
 def _find_sub_id(username: str, db_path: str = XUI_DB_PATH) -> str | None:
