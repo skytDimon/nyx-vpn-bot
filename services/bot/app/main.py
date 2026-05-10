@@ -24,12 +24,15 @@ async def main():
 
     from app.handlers import admin, start
 
-    await bot.set_my_commands(
-        [
-            BotCommand(command="start", description="Start"),
-            BotCommand(command="help", description="Help"),
-        ]
-    )
+    try:
+        await bot.set_my_commands(
+            [
+                BotCommand(command="start", description="Start"),
+                BotCommand(command="help", description="Help"),
+            ]
+        )
+    except Exception:
+        logging.warning("Failed to set bot commands (will retry later)")
     dp = Dispatcher()
     dp.include_router(start.router)
     dp.include_router(admin.router)
