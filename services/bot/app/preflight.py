@@ -5,8 +5,7 @@ import psycopg2
 import redis
 
 from app.config import get_database_url, get_redis_url
-from app.config import get_xui_settings
-from app.services.xui_client import XuiClient
+from app.services.xui_manager import XuiManagerClient
 
 
 def _check_db() -> None:
@@ -31,28 +30,34 @@ def _check_redis() -> None:
         ) from exc
 
 
-async def _check_xui() -> None:
-    xui = XuiClient.from_env()
+async def _check_xui_manager() -> None:
+    import logging
+    logger = logging.getLogger(__name__)
+    client = XuiManagerClient()
     try:
-        await xui.login()
+        import httpx
+        url = f"{client._base_url}/api/add_client"
+        resp = await client._client.get(url, headers={"X-API-Key": client._api_key})
+        if resp.status_code == 404:
+            logger.warning(
+                "X-UI Manager API health check: got 404 (expected). "
+                "Base URL is reachable, proceeding."
+            )
+            return
+        if resp.status_code in (401, 403):
+            raise RuntimeError(
+                "X-UI Manager API: unauthorized. Check API_KEY."
+            )
+        logger.info("X-UI Manager API reachable (status %s)", resp.status_code)
+    except httpx.ConnectError as exc:
+        raise RuntimeError(
+            "X-UI Manager API unreachable. Check API_BASE_URL."
+        ) from exc
     finally:
-        await xui.close()
-
-
-async def _check_xui_optional(country: str) -> None:
-    try:
-        settings = get_xui_settings(country)
-    except RuntimeError:
-        return
-    xui = XuiClient.from_settings(settings)
-    try:
-        await xui.login()
-    finally:
-        await xui.close()
+        await client.close()
 
 
 async def run_preflight() -> None:
     await asyncio.to_thread(_check_db)
     await asyncio.to_thread(_check_redis)
-    await _check_xui()
-    await _check_xui_optional("nl")
+    await _check_xui_manager()

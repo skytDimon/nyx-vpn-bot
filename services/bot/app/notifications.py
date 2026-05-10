@@ -5,10 +5,10 @@ from datetime import datetime, timedelta, timezone
 import redis
 from aiogram import Bot
 
-from app.config import get_redis_url
+from app.config import get_redis_url, get_remind_hours_before
+from app.keyboards.menu import renew_keyboard
 from app.storage import clear_subscription, fetch_subscription_end_dates
 
-THREE_DAYS = timedelta(days=3)
 REDIS_TTL_EXTRA = timedelta(days=7)
 
 
@@ -33,6 +33,9 @@ def _was_notified(key: str) -> bool:
 
 async def notify_subscriptions(bot: Bot) -> None:
     now = datetime.now(timezone.utc)
+    remind_hours = get_remind_hours_before()
+    remind_threshold = timedelta(hours=remind_hours)
+
     for row in fetch_subscription_end_dates():
         tg_id = row["tg_id"]
         end_at = row["end_at"]
@@ -48,8 +51,7 @@ async def notify_subscriptions(bot: Bot) -> None:
             try:
                 await bot.send_message(
                     tg_id,
-                    "⛔️ Подписка завершилась.\n"
-                    "Для продления откройте раздел тарифов и выберите оплату.",
+                    "❌ Пробный период закончился",
                 )
             except Exception:
                 pass
@@ -57,15 +59,17 @@ async def notify_subscriptions(bot: Bot) -> None:
             clear_subscription(tg_id)
             continue
 
-        if end_at - now <= THREE_DAYS:
-            key = _notify_key("three_days", tg_id, end_at)
+        remaining = end_at - now
+        if remaining <= remind_threshold:
+            key = _notify_key("remind", tg_id, end_at)
             if _was_notified(key):
                 continue
+            hours_left = int(remaining.total_seconds() / 3600)
             try:
                 await bot.send_message(
                     tg_id,
-                    "⏳ До окончания подписки осталось 3 дня.\n"
-                    "Продлите доступ заранее, чтобы не потерять VPN.",
+                    f"⏰ Ваш пробник заканчивается через {hours_left} ч. Хотите продлить?",
+                    reply_markup=renew_keyboard(),
                 )
             except Exception:
                 pass

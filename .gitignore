@@ -4,7 +4,13 @@ env/
 **/__pycache__/
 *.pyc
 .DS_Store
-services/bot/bot.db
+*.db
 .ruff_cache/
 .idea/
+.vscode/
 .venv/
+**/.venv/
+*.egg-info/
+dist/
+build/
+CLAUDE.md

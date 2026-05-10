@@ -1,3 +1,3 @@
-from app.handlers import payments, start, subscription
+from app.handlers import admin, start
 
-__all__ = ["start", "subscription", "payments"]
+__all__ = ["start", "admin"]

@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import logging
 
 from alembic import command
 from alembic.config import Config
@@ -15,14 +14,7 @@ import redis
 
 from app.config import get_database_url, get_redis_url
 
-
-@dataclass
-class ReferralInfo:
-    tg_id: int
-    username: str | None
-    balance: int
-    referral_balance: int
-    invited_count: int
+logger = logging.getLogger(__name__)
 
 
 def _connect():
@@ -61,170 +53,26 @@ def ensure_user(tg_id: int, username: str | None) -> None:
             )
 
 
-def set_referrer(tg_id: int, referrer_tg_id: int) -> bool:
-    if tg_id == referrer_tg_id:
-        return False
+def is_trial_used(tg_id: int) -> bool:
     with _connect() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT referrer_tg_id FROM users WHERE tg_id = %s",
-                (tg_id,),
-            )
-            row = cur.fetchone()
-            if not row or row["referrer_tg_id"] is not None:
-                return False
-            cur.execute(
-                "SELECT tg_id FROM users WHERE tg_id = %s",
-                (referrer_tg_id,),
-            )
-            if not cur.fetchone():
-                return False
-            cur.execute(
-                "UPDATE users SET referrer_tg_id = %s WHERE tg_id = %s",
-                (referrer_tg_id, tg_id),
-            )
-    return True
-
-
-def get_referral_info(tg_id: int) -> ReferralInfo | None:
-    with _connect() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                "SELECT tg_id, username, balance, referral_balance FROM users WHERE tg_id = %s",
-                (tg_id,),
-            )
-            row = cur.fetchone()
-            if not row:
-                return None
-            cur.execute(
-                "SELECT COUNT(*) AS count FROM users WHERE referrer_tg_id = %s",
-                (tg_id,),
-            )
-            invited_count = cur.fetchone()["count"]
-            return ReferralInfo(
-                tg_id=row["tg_id"],
-                username=row["username"],
-                balance=row["balance"],
-                referral_balance=row["referral_balance"],
-                invited_count=int(invited_count),
-            )
-
-
-logger = logging.getLogger(__name__)
-
-
-def record_first_payment(tg_id: int, amount: int) -> bool:
-    if amount <= 0:
-        return False
-    reward = int(amount * 0.5)
-    if reward <= 0:
-        return False
-    with _connect() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                """
-                SELECT referrer_tg_id, first_payment_done
-                FROM users
-                WHERE tg_id = %s
-                FOR UPDATE
-                """,
-                (tg_id,),
-            )
-            user = cur.fetchone()
-            if not user:
-                logger.warning(
-                    "Referral credit skipped: user not found tg_id=%s", tg_id
-                )
-                return False
-            if user["first_payment_done"]:
-                logger.info(
-                    "Referral credit skipped: already paid tg_id=%s",
-                    tg_id,
-                )
-                return False
-            referrer_tg_id = user["referrer_tg_id"]
-            if referrer_tg_id is None:
-                logger.info(
-                    "Referral credit skipped: no referrer tg_id=%s",
-                    tg_id,
-                )
-                return False
-            cur.execute(
-                "UPDATE users SET referral_balance = referral_balance + %s WHERE tg_id = %s",
-                (reward, referrer_tg_id),
-            )
-            if cur.rowcount == 0:
-                logger.warning(
-                    "Referral credit failed: referrer missing tg_id=%s referrer=%s",
-                    tg_id,
-                    referrer_tg_id,
-                )
-                return False
-            cur.execute(
-                "UPDATE users SET first_payment_done = TRUE WHERE tg_id = %s",
-                (tg_id,),
-            )
-            logger.info(
-                "Referral credit applied: tg_id=%s referrer=%s reward=%s",
-                tg_id,
-                referrer_tg_id,
-                reward,
-            )
-            return True
-
-
-def transfer_referral_to_balance(tg_id: int, min_amount: int = 150) -> bool:
-    with _connect() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                "SELECT referral_balance FROM users WHERE tg_id = %s FOR UPDATE",
+                "SELECT trial_used FROM users WHERE tg_id = %s",
                 (tg_id,),
             )
             row = cur.fetchone()
             if not row:
                 return False
-            referral_balance = int(row["referral_balance"])
-            if referral_balance < min_amount:
-                return False
-            cur.execute(
-                "UPDATE users SET referral_balance = 0, balance = balance + %s WHERE tg_id = %s",
-                (referral_balance, tg_id),
-            )
-    return True
+            return bool(row["trial_used"])
 
 
-def deduct_balance(tg_id: int, amount: int) -> bool:
-    if amount <= 0:
-        return False
-    with _connect() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                "SELECT balance FROM users WHERE tg_id = %s FOR UPDATE",
-                (tg_id,),
-            )
-            row = cur.fetchone()
-            if not row:
-                return False
-            balance = int(row["balance"])
-            if balance < amount:
-                return False
-            cur.execute(
-                "UPDATE users SET balance = balance - %s WHERE tg_id = %s",
-                (amount, tg_id),
-            )
-    return True
-
-
-def add_balance(tg_id: int, amount: int) -> bool:
-    if amount <= 0:
-        return False
+def set_trial_used(tg_id: int) -> None:
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE users SET balance = balance + %s WHERE tg_id = %s",
-                (amount, tg_id),
+                "UPDATE users SET trial_used = TRUE WHERE tg_id = %s",
+                (tg_id,),
             )
-            return cur.rowcount > 0
 
 
 def set_subscription(
@@ -233,26 +81,30 @@ def set_subscription(
     end_at: datetime,
     subscription_link: str,
     instructions: str,
-    country: str = "fi",
+    country: str = "nl",
+    client_uuid: str | None = None,
+    sub_id: str | None = None,
 ) -> None:
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO subscriptions (tg_id, start_at, end_at, subscription_link, instructions, country)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO subscriptions (tg_id, start_at, end_at, subscription_link, instructions, country, client_uuid, sub_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (tg_id)
                 DO UPDATE SET start_at = EXCLUDED.start_at,
                               end_at = EXCLUDED.end_at,
                               subscription_link = EXCLUDED.subscription_link,
                               instructions = EXCLUDED.instructions,
                               country = EXCLUDED.country,
+                              client_uuid = EXCLUDED.client_uuid,
+                              sub_id = EXCLUDED.sub_id,
                               updated_at = NOW()
                 """,
-                (tg_id, start_at, end_at, subscription_link, instructions, country),
+                (tg_id, start_at, end_at, subscription_link, instructions, country, client_uuid, sub_id),
             )
     _cache_set_subscription(
-        tg_id, start_at, end_at, subscription_link, instructions, country
+        tg_id, start_at, end_at, subscription_link, instructions, country, client_uuid, sub_id
     )
 
 
@@ -264,7 +116,7 @@ def get_subscription(tg_id: int) -> tuple[datetime | None, datetime | None]:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT start_at, end_at, subscription_link, instructions, country
+                SELECT start_at, end_at, subscription_link, instructions, country, client_uuid, sub_id
                 FROM subscriptions WHERE tg_id = %s
                 """,
                 (tg_id,),
@@ -285,6 +137,8 @@ def get_subscription(tg_id: int) -> tuple[datetime | None, datetime | None]:
                 row["subscription_link"],
                 row["instructions"],
                 row.get("country") or "nl",
+                row.get("client_uuid"),
+                row.get("sub_id"),
             )
             return start_at, end_at
 
@@ -297,7 +151,7 @@ def get_vpn_data(tg_id: int) -> tuple[str | None, str | None]:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT subscription_link, instructions, end_at, country
+                SELECT subscription_link, instructions, end_at, country, client_uuid, sub_id
                 FROM subscriptions WHERE tg_id = %s
                 """,
                 (tg_id,),
@@ -322,12 +176,14 @@ def get_subscription_meta(tg_id: int) -> dict | None:
             "subscription_link": cached["subscription_link"],
             "instructions": cached["instructions"],
             "country": cached.get("country") or "nl",
+            "client_uuid": cached.get("client_uuid"),
+            "sub_id": cached.get("sub_id"),
         }
     with _connect() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT start_at, end_at, subscription_link, instructions, country
+                SELECT start_at, end_at, subscription_link, instructions, country, client_uuid, sub_id
                 FROM subscriptions WHERE tg_id = %s
                 """,
                 (tg_id,),
@@ -346,8 +202,10 @@ def get_subscription_meta(tg_id: int) -> dict | None:
                 row["subscription_link"],
                 row["instructions"],
                 row.get("country") or "nl",
+                row.get("client_uuid"),
+                row.get("sub_id"),
             )
-            return row
+            return dict(row)
 
 
 def clear_subscription(tg_id: int) -> None:
@@ -404,34 +262,6 @@ def fetch_active_subscriptions_with_users(country: str | None = None) -> list[di
             return list(cur.fetchall())
 
 
-def update_subscription_record(
-    tg_id: int,
-    start_at: datetime | None,
-    end_at: datetime | None,
-    subscription_link: str | None,
-    instructions: str | None,
-    country: str | None = None,
-) -> None:
-    with _connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE subscriptions
-                SET start_at = %s,
-                    end_at = %s,
-                    subscription_link = %s,
-                    instructions = %s,
-                    country = COALESCE(%s, country),
-                    updated_at = NOW()
-                WHERE tg_id = %s
-                """,
-                (start_at, end_at, subscription_link, instructions, country, tg_id),
-            )
-    _cache_set_subscription(
-        tg_id, start_at, end_at, subscription_link, instructions, country
-    )
-
-
 def fetch_all_user_ids() -> list[int]:
     with _connect() as conn:
         with conn.cursor() as cur:
@@ -460,6 +290,34 @@ def fetch_users_with_subscription_links(
             return list(cur.fetchall())
 
 
+def update_subscription_record(
+    tg_id: int,
+    start_at: datetime | None,
+    end_at: datetime | None,
+    subscription_link: str | None,
+    instructions: str | None,
+    country: str | None = None,
+) -> None:
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE subscriptions
+                SET start_at = %s,
+                    end_at = %s,
+                    subscription_link = %s,
+                    instructions = %s,
+                    country = COALESCE(%s, country),
+                    updated_at = NOW()
+                WHERE tg_id = %s
+                """,
+                (start_at, end_at, subscription_link, instructions, country, tg_id),
+            )
+    _cache_set_subscription(
+        tg_id, start_at, end_at, subscription_link, instructions, country
+    )
+
+
 def _cache_key(tg_id: int) -> str:
     return f"subscription:{tg_id}"
 
@@ -471,6 +329,8 @@ def _cache_set_subscription(
     subscription_link: str | None,
     instructions: str | None,
     country: str | None = None,
+    client_uuid: str | None = None,
+    sub_id: str | None = None,
 ) -> None:
     if not end_at:
         return
@@ -487,6 +347,8 @@ def _cache_set_subscription(
             "subscription_link": subscription_link,
             "instructions": instructions,
             "country": country,
+            "client_uuid": client_uuid,
+            "sub_id": sub_id,
         }
     )
     try:
@@ -517,6 +379,8 @@ def _cache_get_subscription(tg_id: int) -> dict | None:
         "subscription_link": data.get("subscription_link"),
         "instructions": data.get("instructions"),
         "country": data.get("country") or "nl",
+        "client_uuid": data.get("client_uuid"),
+        "sub_id": data.get("sub_id"),
     }
 
 

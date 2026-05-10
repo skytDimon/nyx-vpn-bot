@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 
 from dotenv import find_dotenv, load_dotenv
 
@@ -24,16 +23,6 @@ def _require(name: str) -> str:
     return value
 
 
-@dataclass(frozen=True)
-class XuiSettings:
-    base_url: str
-    username: str
-    password: str
-    inbound_id: int
-    sub_url: str | None
-    country: str = "fi"
-
-
 def get_bot_token() -> str:
     return _require("BOT_TOKEN")
 
@@ -47,25 +36,20 @@ def get_redis_url() -> str:
     return os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 
-def get_xui_settings(country: str = "nl") -> XuiSettings:
-    load_env()
-    prefix = "NL_" if country == "nl" else ""
-    base_url = _require(f"{prefix}XUI_URL")
-    username = _require(f"{prefix}XUI_USERNAME")
-    password = _require(f"{prefix}XUI_PASSWORD")
-    inbound_id = int(_require(f"{prefix}XUI_INBOUND_ID"))
-    sub_url = os.getenv(f"{prefix}XUI_SUB_URL")
-    return XuiSettings(
-        base_url=base_url,
-        username=username,
-        password=password,
-        inbound_id=inbound_id,
-        sub_url=sub_url,
-        country=country,
-    )
+def get_api_key() -> str:
+    return _require("API_KEY")
 
 
-def get_miniapp_url() -> str:
+def get_api_base_url() -> str:
     load_env()
-    value = os.getenv("MINIAPP_URL", "http://localhost:8010")
-    return value.rstrip("/")
+    return os.getenv("API_BASE_URL", "https://nyxvpnde.port0.org:8442")
+
+
+def get_trial_days() -> int:
+    load_env()
+    return int(os.getenv("TRIAL_DAYS", "3"))
+
+
+def get_remind_hours_before() -> int:
+    load_env()
+    return int(os.getenv("REMIND_HOURS_BEFORE", "20"))

@@ -19,23 +19,20 @@ async def main():
     bot = Bot(token=token)
     scheduler = AsyncIOScheduler()
     scheduler.add_job(purge_expired_subscriptions, "interval", hours=12)
-    scheduler.add_job(notify_subscriptions, "interval", hours=6, args=[bot])
+    scheduler.add_job(notify_subscriptions, "interval", hours=1, args=[bot])
     scheduler.start()
 
-    from app.handlers import payments, start, subscription
+    from app.handlers import admin, start
 
     await bot.set_my_commands(
         [
             BotCommand(command="start", description="Start"),
             BotCommand(command="help", description="Help"),
-            BotCommand(command="info", description="Info"),
-            BotCommand(command="my_vpn", description="Мой VPN"),
         ]
     )
     dp = Dispatcher()
     dp.include_router(start.router)
-    dp.include_router(subscription.router)
-    dp.include_router(payments.router)
+    dp.include_router(admin.router)
     try:
         await dp.start_polling(bot)
     finally:
