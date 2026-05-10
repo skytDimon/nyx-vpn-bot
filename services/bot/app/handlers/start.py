@@ -129,7 +129,7 @@ async def _request_trial(user, message, callback=None):
         await message.answer(text, reply_markup=main_menu_keyboard(), disable_web_page_preview=True)
         return
 
-    username = user.username or f"tg_{user.id}"
+    username = f"@{user.username}" if user.username else f"@tg_{user.id}"
     trial_days = get_trial_days()
 
     client = XuiManagerClient()
