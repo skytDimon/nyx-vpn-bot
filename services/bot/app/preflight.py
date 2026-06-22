@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import urllib.parse
+
 import psycopg2
 import redis
 
-from app.config import get_database_url, get_redis_url
-from app.services.xui_manager import XuiManagerClient
+from app.config import get_database_url, get_redis_url, get_xui_settings
+
+logger = logging.getLogger(__name__)
 
 
 def _check_db() -> None:
@@ -30,34 +34,32 @@ def _check_redis() -> None:
         ) from exc
 
 
-async def _check_xui_manager() -> None:
-    import logging
-    logger = logging.getLogger(__name__)
-    client = XuiManagerClient()
+async def _check_xui() -> None:
+    import httpx
+    settings = get_xui_settings()
+    parsed = urllib.parse.urlsplit(settings.base_url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+    base_path = parsed.path.rstrip("/")
+    login_url = f"{base_url}{base_path}/login"
+    client = httpx.AsyncClient(verify=False, timeout=10.0)
     try:
-        import httpx
-        url = f"{client._base_url}/api/add_client"
-        resp = await client._client.get(url, headers={"X-API-Key": client._api_key})
-        if resp.status_code == 404:
-            logger.warning(
-                "X-UI Manager API health check: got 404 (expected). "
-                "Base URL is reachable, proceeding."
-            )
-            return
-        if resp.status_code in (401, 403):
-            raise RuntimeError(
-                "X-UI Manager API: unauthorized. Check API_KEY."
-            )
-        logger.info("X-UI Manager API reachable (status %s)", resp.status_code)
+        resp = await client.post(
+            login_url,
+            data={"username": settings.username, "password": settings.password},
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("success"):
+                logger.info("XUI panel reachable and login successful")
+                return
+        raise RuntimeError(f"XUI login failed: {resp.status_code} {resp.text}")
     except httpx.ConnectError as exc:
-        raise RuntimeError(
-            "X-UI Manager API unreachable. Check API_BASE_URL."
-        ) from exc
+        raise RuntimeError(f"XUI panel unreachable: {settings.base_url}") from exc
     finally:
-        await client.close()
+        await client.aclose()
 
 
 async def run_preflight() -> None:
     await asyncio.to_thread(_check_db)
     await asyncio.to_thread(_check_redis)
-    await _check_xui_manager()
+    await _check_xui()

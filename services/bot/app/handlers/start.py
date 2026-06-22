@@ -11,7 +11,7 @@ from aiogram.types import CallbackQuery, FSInputFile, Message
 
 from app.config import get_trial_days
 from app.keyboards.menu import main_menu_keyboard, renew_keyboard
-from app.services.xui_manager import XuiManagerClient
+from app.services.xui_client import XuiClient
 from app.storage import (
     ensure_user,
     get_subscription,
@@ -132,9 +132,9 @@ async def _request_trial(user, message, callback=None):
     username = f"@{user.username}" if user.username else f"@tg_{user.id}"
     trial_days = get_trial_days()
 
-    client = XuiManagerClient()
+    client = XuiClient.from_env()
     try:
-        result = await client.add_client(username=username, days=trial_days)
+        sub_id = await client.add_client(email=username, days=trial_days)
     except httpx.TimeoutException:
         await message.answer(
             "⚠️ Сервис временно недоступен. Попробуйте чуть позже.",
@@ -142,7 +142,7 @@ async def _request_trial(user, message, callback=None):
         )
         return
     except httpx.HTTPStatusError as e:
-        logger.error("X-UI Manager API error: %s", e)
+        logger.error("XUI API error: %s", e)
         await message.answer(
             "⚠️ Ошибка при создании пробника. Попробуйте чуть позже.",
             reply_markup=main_menu_keyboard(),
@@ -158,15 +158,7 @@ async def _request_trial(user, message, callback=None):
     finally:
         await client.close()
 
-    if not result.success:
-        logger.error("X-UI Manager returned failure: %s", result.message)
-        await message.answer(
-            "⚠️ Не удалось создать пробник. Попробуйте чуть позже.",
-            reply_markup=main_menu_keyboard(),
-        )
-        return
-
-    sub_link = result.subscription_url
+    sub_link = client.subscription_link(sub_id)
     instructions = vpn_instructions(sub_link)
 
     start_at = datetime.now(timezone.utc)
@@ -178,8 +170,8 @@ async def _request_trial(user, message, callback=None):
         sub_link,
         instructions,
         "nl",
-        client_uuid=result.client_uuid,
-        sub_id=result.sub_id,
+        client_uuid=None,
+        sub_id=sub_id,
     )
     set_trial_used(user.id)
 
