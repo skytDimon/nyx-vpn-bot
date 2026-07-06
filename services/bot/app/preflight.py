@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import urllib.parse
 
 import psycopg2
 import redis
 
-from app.config import get_database_url, get_redis_url, get_xui_settings
+from app.config import get_database_url, get_redis_url
+from app.services.xui_client import XuiClient
 
 logger = logging.getLogger(__name__)
 
@@ -35,28 +35,12 @@ def _check_redis() -> None:
 
 
 async def _check_xui() -> None:
-    import httpx
-    settings = get_xui_settings()
-    parsed = urllib.parse.urlsplit(settings.base_url)
-    base_url = f"{parsed.scheme}://{parsed.netloc}"
-    base_path = parsed.path.rstrip("/")
-    login_url = f"{base_url}{base_path}/login"
-    client = httpx.AsyncClient(verify=False, timeout=10.0)
+    client = XuiClient.from_env()
     try:
-        resp = await client.post(
-            login_url,
-            data={"username": settings.username, "password": settings.password},
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("success"):
-                logger.info("XUI panel reachable and login successful")
-                return
-        raise RuntimeError(f"XUI login failed: {resp.status_code} {resp.text}")
-    except httpx.ConnectError as exc:
-        raise RuntimeError(f"XUI panel unreachable: {settings.base_url}") from exc
+        await client.login()
+        logger.info("XUI panel reachable and login successful")
     finally:
-        await client.aclose()
+        await client.close()
 
 
 async def run_preflight() -> None:

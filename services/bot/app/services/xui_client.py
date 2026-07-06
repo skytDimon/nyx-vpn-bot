@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
@@ -9,6 +10,8 @@ from uuid import uuid4
 import httpx
 
 from app.config import get_xui_settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -24,6 +27,7 @@ class XuiConfig:
 class XuiClient:
     def __init__(self, config: XuiConfig):
         self._config = config
+        self._csrf_token: str | None = None
         self._client = httpx.AsyncClient(
             base_url=config.base_url,
             verify=False,
@@ -62,14 +66,29 @@ class XuiClient:
         await self._client.aclose()
 
     async def login(self) -> None:
-        response = await self._client.post(
+        await self._fetch_csrf_token()
+        payload = {"username": self._config.username, "password": self._config.password}
+        paths = [
             f"{self._config.base_path}/login",
-            data={"username": self._config.username, "password": self._config.password},
-        )
-        response.raise_for_status()
-        data = response.json()
-        if not data.get("success"):
-            raise RuntimeError("XUI login failed")
+            f"{self._config.base_path}/login/",
+        ]
+        last_error: str | None = None
+        for path in paths:
+            for mode in ("data", "json"):
+                response = await self._post(path, payload, mode=mode)
+                if response.status_code == 404:
+                    last_error = f"404 on {path} ({mode})"
+                    continue
+                if response.status_code in (401, 403):
+                    last_error = f"{response.status_code} on {path} ({mode}): {response.text}"
+                    continue
+                response.raise_for_status()
+                data = response.json()
+                if data.get("success"):
+                    logger.info("XUI login successful via %s (%s)", path, mode)
+                    return
+                last_error = data.get("msg") or f"login failed on {path} ({mode})"
+        raise RuntimeError(f"XUI login failed: {last_error}")
 
     async def add_client(self, email: str, days: int = 3) -> str:
         await self.login()
@@ -101,15 +120,22 @@ class XuiClient:
             ]
             last_error: str | None = None
             for path in paths:
-                response = await self._client.post(path, data=payload)
-                if response.status_code == 404:
-                    last_error = f"404 on {path}"
+                for mode in ("data", "json"):
+                    response = await self._post(path, payload, mode=mode)
+                    content_type = response.headers.get("content-type", "")
+                    if response.status_code == 404 or "application/json" not in content_type:
+                        last_error = f"404 on {path} ({mode})"
+                        continue
+                    response.raise_for_status()
+                    data = response.json()
+                    if not data.get("success"):
+                        message = data.get("msg") or "XUI addClient failed"
+                        last_error = f"{path} ({mode}): {message}"
+                        continue
+                    logger.info("XUI client added to inbound %s via %s (%s)", inbound_id, path, mode)
+                    break
+                else:
                     continue
-                response.raise_for_status()
-                data = response.json()
-                if not data.get("success"):
-                    message = data.get("msg") or "XUI addClient failed"
-                    raise RuntimeError(f"inbound {inbound_id}: {message}")
                 break
             else:
                 raise RuntimeError(
@@ -119,8 +145,49 @@ class XuiClient:
 
     def subscription_link(self, sub_id: str) -> str:
         if self._config.sub_url:
+            if "{sub_id}" in self._config.sub_url:
+                return self._config.sub_url.format(sub_id=sub_id)
             return f"{self._config.sub_url}/sub/{sub_id}"
         return f"{self._config.base_url}{self._config.base_path}/sub/{sub_id}"
+
+    async def _post(self, path: str, payload: dict, mode: str) -> httpx.Response:
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" if mode == "data" else "application/json",
+            "Referer": f"{self._config.base_url}{self._config.base_path}/",
+            "Origin": self._config.base_url,
+            "User-Agent": "Mozilla/5.0",
+            "X-Requested-With": "XMLHttpRequest",
+        }
+        if self._csrf_token:
+            headers["X-CSRF-Token"] = self._csrf_token
+        if mode == "json":
+            response = await self._client.post(path, json=payload, headers=headers)
+        else:
+            response = await self._client.post(path, data=payload, headers=headers)
+        if response.status_code == 403:
+            self._csrf_token = None
+            await self._fetch_csrf_token()
+            if self._csrf_token:
+                headers["X-CSRF-Token"] = self._csrf_token
+                if mode == "json":
+                    response = await self._client.post(path, json=payload, headers=headers)
+                else:
+                    response = await self._client.post(path, data=payload, headers=headers)
+        return response
+
+    async def _fetch_csrf_token(self) -> None:
+        response = await self._client.get(
+            f"{self._config.base_path}/csrf-token",
+            headers={"X-Requested-With": "XMLHttpRequest", "User-Agent": "Mozilla/5.0"},
+        )
+        if response.status_code == 404:
+            return
+        response.raise_for_status()
+        data = response.json()
+        token = data.get("obj") if data.get("success") else None
+        if isinstance(token, str) and token:
+            self._csrf_token = token
 
     async def get_client_subscription(self, email: str) -> tuple[str, datetime] | None:
         await self.login()
@@ -134,7 +201,8 @@ class XuiClient:
         last_error: str | None = None
         for path in paths:
             response = await self._client.get(path)
-            if response.status_code == 404:
+            content_type = response.headers.get("content-type", "")
+            if response.status_code == 404 or "application/json" not in content_type:
                 last_error = f"404 on {path}"
                 continue
             response.raise_for_status()
