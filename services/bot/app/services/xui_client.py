@@ -96,17 +96,21 @@ class XuiClient:
         expiry_time = int(expire_at.timestamp() * 1000)
         client_id = str(uuid4())
         sub_id = uuid4().hex
+        client = {
+            "id": client_id,
+            "email": email,
+            "enable": True,
+            "expiryTime": expiry_time,
+            "totalGB": 0,
+            "limitIp": 0,
+            "subId": sub_id,
+        }
+        if await self._add_client_via_clients_api(client):
+            return sub_id
+
         settings = {
             "clients": [
-                {
-                    "id": client_id,
-                    "email": email,
-                    "enable": True,
-                    "expiryTime": expiry_time,
-                    "totalGB": 0,
-                    "limitIp": 0,
-                    "subId": sub_id,
-                }
+                client
             ]
         }
         for inbound_id in self._config.inbound_ids:
@@ -142,6 +146,23 @@ class XuiClient:
                     f"XUI addClient endpoint not found for inbound {inbound_id}: {last_error}"
                 )
         return sub_id
+
+    async def _add_client_via_clients_api(self, client: dict) -> bool:
+        path = f"{self._config.base_path}/panel/api/clients/add"
+        payload = {"client": client, "inboundIds": self._config.inbound_ids}
+        response = await self._post(path, payload, mode="json")
+        if response.status_code == 404:
+            return False
+        response.raise_for_status()
+        data = response.json()
+        if data.get("success"):
+            logger.info(
+                "XUI client added via clients API to inbounds %s",
+                self._config.inbound_ids,
+            )
+            return True
+        message = data.get("msg") or "XUI clients/add failed"
+        raise RuntimeError(f"XUI clients/add failed: {message}")
 
     def subscription_link(self, sub_id: str) -> str:
         if self._config.sub_url:
