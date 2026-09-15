@@ -19,7 +19,7 @@ from app.storage import (
     set_subscription,
     set_trial_used,
 )
-from app.vpn_instructions import vpn_instructions
+from app.vpn_instructions import APPSTORE_SECTION, WHITELIST_SECTION, vpn_instructions
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -28,6 +28,22 @@ logger = logging.getLogger(__name__)
 @router.message(CommandStart())
 async def start_handler(message: Message):
     ensure_user(message.from_user.id, message.from_user.username)
+
+    payload = _extract_start_payload(message.text)
+    if payload:
+        if payload.startswith("ref_"):
+            try:
+                referrer_tg_id = int(payload[4:])
+                from app.storage import set_referrer
+                if set_referrer(message.from_user.id, referrer_tg_id):
+                    logger.info("Set referrer %s for user %s", referrer_tg_id, message.from_user.id)
+            except (ValueError, IndexError):
+                pass
+        elif payload == "extend":
+            from app.handlers.payment import show_sbp_instructions
+            await show_sbp_instructions(message)
+            return
+
     image_path = Path(__file__).resolve().parents[2] / "img" / "start.png"
     text = (
         "🐾 Привет! Это твой личный VPN‑сервис.\n"
@@ -42,6 +58,14 @@ async def start_handler(message: Message):
         )
     else:
         await message.answer(text, reply_markup=main_menu_keyboard())
+
+
+def _extract_start_payload(text: str | None) -> str | None:
+    """Извлечь payload из /start команды."""
+    if not text:
+        return None
+    parts = text.split(maxsplit=1)
+    return parts[1] if len(parts) > 1 else None
 
 
 @router.message(Command("help"))
@@ -74,6 +98,18 @@ async def info_handler(message: Message):
         )
     else:
         await message.answer(text, reply_markup=main_menu_keyboard())
+
+
+@router.message(Command("appstore"))
+@router.message(lambda message: message.text in {"🍎 App Store", "App Store"})
+async def appstore_handler(message: Message):
+    await message.answer(APPSTORE_SECTION, reply_markup=main_menu_keyboard())
+
+
+@router.message(Command("whitelist"))
+@router.message(lambda message: message.text in {"🌐 Белый список", "Белый список"})
+async def whitelist_handler(message: Message):
+    await message.answer(WHITELIST_SECTION, reply_markup=main_menu_keyboard())
 
 
 @router.message(lambda message: message.text in {"🧪 Получить пробник", "Получить пробник"})
@@ -170,7 +206,7 @@ async def _request_trial(user, message, callback=None):
         sub_link,
         instructions,
         "nl",
-        client_uuid=None,
+        client_uuid=username,
         sub_id=sub_id,
     )
     set_trial_used(user.id)

@@ -228,6 +228,142 @@ def purge_expired_subscriptions() -> int:
     return deleted
 
 
+def extend_subscription(tg_id: int, days: int) -> datetime | None:
+    """Продлить подписку пользователя на `days` дней.
+
+    Возвращает новый end_at или None если подписки/пользователя нет.
+    Обновляет кэш Redis (TTL пересчитается от new end_at).
+    """
+    with _connect() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT username, referral_balance, first_payment_done, referrer_tg_id
+                FROM users WHERE tg_id = %s
+                """,
+                (tg_id,),
+            )
+            user = cur.fetchone()
+            if not user:
+                return None
+
+            cur.execute(
+                "SELECT sub_id, end_at, subscription_link, instructions, country FROM subscriptions WHERE tg_id = %s",
+                (tg_id,),
+            )
+            sub = cur.fetchone()
+
+            now = datetime.now(timezone.utc)
+            if sub and sub.get("end_at"):
+                current_end = _normalize_dt(sub["end_at"])
+                anchor = current_end if (current_end and current_end > now) else now
+            else:
+                anchor = now
+
+            new_end_at = anchor + timedelta(days=days)
+
+            if sub:
+                cur.execute(
+                    "UPDATE subscriptions SET end_at = %s, updated_at = NOW() WHERE tg_id = %s",
+                    (new_end_at, tg_id),
+                )
+                cur.execute(
+                    "SELECT start_at, subscription_link, instructions, country, client_uuid, sub_id FROM subscriptions WHERE tg_id = %s",
+                    (tg_id,),
+                )
+                refreshed = cur.fetchone()
+                if refreshed:
+                    _cache_set_subscription(
+                        tg_id,
+                        refreshed.get("start_at"),
+                        new_end_at,
+                        refreshed.get("subscription_link"),
+                        refreshed.get("instructions"),
+                        refreshed.get("country"),
+                        refreshed.get("client_uuid"),
+                        refreshed.get("sub_id"),
+                    )
+            else:
+                cur.execute(
+                    "UPDATE users SET first_payment_done = TRUE WHERE tg_id = %s AND first_payment_done = FALSE",
+                    (tg_id,),
+                )
+                _cache_clear_subscription(tg_id)
+
+            return new_end_at
+
+
+def get_user_username(tg_id: int) -> str | None:
+    """Вернуть username пользователя из БД (None если нет)."""
+    with _connect() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT username FROM users WHERE tg_id = %s", (tg_id,))
+            row = cur.fetchone()
+            return row.get("username") if row else None
+
+
+def set_referrer(tg_id: int, referrer_tg_id: int) -> bool:
+    """Установить реферера (один раз). Возвращает True если установлен."""
+    if tg_id == referrer_tg_id:
+        return False
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE users
+                SET referrer_tg_id = %s
+                WHERE tg_id = %s AND referrer_tg_id IS NULL
+                """,
+                (referrer_tg_id, tg_id),
+            )
+            return cur.rowcount > 0
+
+
+def get_referral_info(tg_id: int) -> dict:
+    with _connect() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT referral_balance FROM users WHERE tg_id = %s",
+                (tg_id,),
+            )
+            row = cur.fetchone()
+            balance = int(row["referral_balance"] or 0) if row else 0
+            cur.execute("SELECT COUNT(*) AS c FROM users WHERE referrer_tg_id = %s", (tg_id,))
+            invited = int(cur.fetchone()["c"] or 0)
+            return {"referral_balance": balance, "invited_count": invited}
+
+
+def record_first_payment_and_reward(tg_id: int, reward: int = 75) -> dict | None:
+    """После успешной оплаты: пометить первую оплату и начислить рефереру бонус.
+
+    Возвращает {"referrer_tg_id": int, "credited": int} если бонус начислен, иначе None.
+    """
+    with _connect() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT referrer_tg_id, first_payment_done FROM users WHERE tg_id = %s",
+                (tg_id,),
+            )
+            user = cur.fetchone()
+            if not user or not user.get("referrer_tg_id") or bool(user.get("first_payment_done")):
+                return None
+
+            referrer_tg_id = int(user["referrer_tg_id"])
+
+            cur.execute(
+                "UPDATE users SET first_payment_done = TRUE WHERE tg_id = %s AND first_payment_done = FALSE",
+                (tg_id,),
+            )
+            if cur.rowcount == 0:
+                return None
+
+            cur.execute(
+                "UPDATE users SET referral_balance = COALESCE(referral_balance, 0) + %s WHERE tg_id = %s",
+                (reward, referrer_tg_id),
+            )
+            return {"referrer_tg_id": referrer_tg_id, "credited": reward}
+
+
 def fetch_subscription_end_dates() -> list[dict]:
     with _connect() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:

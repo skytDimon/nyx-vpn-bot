@@ -74,3 +74,40 @@ def get_xui_settings() -> XuiSettings:
         inbound_ids=inbound_ids,
         sub_url=sub_url,
     )
+
+
+def get_admin_id() -> int:
+    return int(_require("ADMIN_ID"))
+
+
+def get_sbp_phone_number() -> str:
+    return _require("SBP_PHONE_NUMBER")
+
+
+def get_smtp_settings() -> dict:
+    load_env()
+    return {
+        "host": "smtp.gmail.com",
+        "port": 587,
+        "login": "dimdimich112008@gmail.com",
+        "password": _require("GMAIL_APP_PASSWORD"),
+        "to_email": "dimdimich112008@gmail.com",
+    }
+
+
+def get_payment_amount() -> int:
+    load_env()
+    return int(os.getenv("PAYMENT_AMOUNT", "150"))
+
+
+def get_payment_days() -> int:
+    load_env()
+    return int(os.getenv("PAYMENT_DAYS", "30"))
+
+
+def get_jwt_secret() -> str:
+    return _require("JWT_SECRET")
+
+
+def get_cabinet_url() -> str:
+    return _require("CABINET_URL")

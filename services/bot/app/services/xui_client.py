@@ -164,6 +164,198 @@ class XuiClient:
         message = data.get("msg") or "XUI clients/add failed"
         raise RuntimeError(f"XUI clients/add failed: {message}")
 
+    async def extend_client(
+        self, email: str, days: int, current_end_at: datetime | None = None
+    ) -> datetime:
+        """Продлить клиента на `days` дней.
+
+        Если `current_end_at` передан — новая дата = max(now, current_end_at) + days.
+        Иначе читаем expiryTime из панели.
+        """
+        await self.login()
+        base = current_end_at or await self._read_client_expiry(email)
+        now = datetime.now(timezone.utc)
+        anchor = base if (base and base > now) else now
+        new_end_at = anchor + timedelta(days=days)
+        expiry_time = int(new_end_at.timestamp() * 1000)
+
+        ok = await self._update_client_expiry(email, expiry_time)
+        if not ok:
+            raise RuntimeError(f"XUI extend_client: failed to update expiry for {email}")
+        logger.info("XUI client %s extended to %s", email, new_end_at)
+        return new_end_at
+
+    async def _read_client_expiry(self, email: str) -> datetime | None:
+        result = await self.get_client_subscription(email)
+        if not result:
+            return None
+        return result[1]
+
+    async def _update_client_expiry(self, email: str, expiry_time_ms: int) -> bool:
+        """Пробует modern update endpoint (v3.7.0), затем несколько путей.
+
+        Панель ищет запись по uuid/email внутри полного объекта клиента,
+        поэтому сначала читаем существующий объект через inbounds/list
+        и отправляем его целиком с обновлённым expiryTime.
+        """
+        existing = await self._get_client_object(email)
+        if existing is None:
+            logger.warning("XUI client %s not found on panel, cannot update", email)
+            return False
+        updated = dict(existing)
+        updated["expiryTime"] = expiry_time_ms
+        updated["enable"] = True
+        paths = [
+            f"{self._config.base_path}/panel/api/clients/update/{email}",
+            f"{self._config.base_path}/panel/api/clients/update",
+        ]
+        for path in paths:
+            for payload in (
+                {"client": updated},
+                updated,
+                {"email": email, "expiryTime": expiry_time_ms},
+            ):
+                response = await self._post(path, payload, mode="json")
+                content_type = response.headers.get("content-type", "")
+                if response.status_code == 404 or "application/json" not in content_type:
+                    continue
+                try:
+                    data = response.json()
+                except json.JSONDecodeError:
+                    continue
+                if data.get("success"):
+                    logger.info("XUI expiry updated via %s", path)
+                    return True
+                logger.warning("XUI update via %s rejected: %s", path, data.get("msg"))
+        return False
+
+    async def list_all_clients(self) -> list[dict]:
+        """Все клиенты на настроенных inbound'ах. Логин вызывает вызывающий код."""
+        paths = [
+            f"{self._config.base_path}/panel/api/inbounds/list",
+            f"{self._config.base_path}/panel/api/inbound/list",
+            f"{self._config.base_path}/panel/inbounds/list",
+            f"{self._config.base_path}/panel/inbound/list",
+            f"{self._config.base_path}/api/inbounds/list",
+        ]
+        for path in paths:
+            response = await self._client.get(path)
+            content_type = response.headers.get("content-type", "")
+            if response.status_code == 404 or "application/json" not in content_type:
+                continue
+            response.raise_for_status()
+            data = response.json()
+            if not data.get("success"):
+                continue
+            obj = data.get("obj") or data.get("data") or []
+            if isinstance(obj, dict):
+                obj = obj.get("list") or obj.get("items") or []
+            out: list[dict] = []
+            for inbound in obj:
+                if inbound.get("id") not in self._config.inbound_ids:
+                    continue
+                settings = inbound.get("settings")
+                if isinstance(settings, str):
+                    try:
+                        settings = json.loads(settings)
+                    except json.JSONDecodeError:
+                        settings = None
+                if not isinstance(settings, dict):
+                    continue
+                for client in settings.get("clients", []):
+                    email = client.get("email")
+                    sub_id = client.get("subId") or client.get("sub_id") or ""
+                    expiry = client.get("expiryTime") or 0
+                    if not email:
+                        continue
+                    out.append({
+                        "email": email,
+                        "subId": sub_id,
+                        "expiryTime": int(expiry) if expiry else 0,
+                        "enable": bool(client.get("enable")),
+                        "inbound_id": inbound.get("id"),
+                    })
+            return out
+        raise RuntimeError("XUI inbounds list endpoint not found (list_all_clients)")
+
+    async def _get_client_object(self, email: str) -> dict | None:
+        """Вернуть сырой объект клиента из inbounds/list по email."""
+        paths = [
+            f"{self._config.base_path}/panel/api/inbounds/list",
+            f"{self._config.base_path}/panel/api/inbound/list",
+            f"{self._config.base_path}/panel/inbounds/list",
+            f"{self._config.base_path}/panel/inbound/list",
+            f"{self._config.base_path}/api/inbounds/list",
+        ]
+        for path in paths:
+            response = await self._client.get(path)
+            content_type = response.headers.get("content-type", "")
+            if response.status_code == 404 or "application/json" not in content_type:
+                continue
+            response.raise_for_status()
+            data = response.json()
+            if not data.get("success"):
+                continue
+            obj = data.get("obj") or data.get("data") or []
+            if isinstance(obj, dict):
+                obj = obj.get("list") or obj.get("items") or []
+            for inbound in obj:
+                if inbound.get("id") not in self._config.inbound_ids:
+                    continue
+                settings = inbound.get("settings")
+                if isinstance(settings, str):
+                    try:
+                        settings = json.loads(settings)
+                    except json.JSONDecodeError:
+                        settings = None
+                if not isinstance(settings, dict):
+                    continue
+                for client in settings.get("clients", []):
+                    if client.get("email") == email:
+                        return client
+        return None
+
+    async def get_client_traffic(self, email: str) -> dict | None:
+        await self.login()
+        paths = [
+            f"{self._config.base_path}/panel/api/clients/{email}/traffic",
+            f"{self._config.base_path}/panel/api/client/{email}/traffic",
+        ]
+        for path in paths:
+            response = await self._client.get(path)
+            content_type = response.headers.get("content-type", "")
+            if response.status_code == 404 or "application/json" not in content_type:
+                continue
+            response.raise_for_status()
+            data = response.json()
+            obj = data.get("obj") or data.get("data") or {}
+            if isinstance(obj, dict):
+                return {
+                    "up": int(obj.get("up", 0) or 0),
+                    "down": int(obj.get("down", 0) or 0),
+                    "total": int(obj.get("total") or obj.get("traffic") or 0),
+                }
+        return None
+
+    async def delete_client(self, email: str) -> bool:
+        await self.login()
+        paths = [
+            f"{self._config.base_path}/panel/api/clients/delete/{email}",
+        ]
+        for path in paths:
+            response = await self._post(path, {}, mode="json")
+            content_type = response.headers.get("content-type", "")
+            if response.status_code == 404 or "application/json" not in content_type:
+                continue
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                continue
+            if data.get("success"):
+                logger.info("XUI client %s deleted", email)
+                return True
+        return False
+
     def subscription_link(self, sub_id: str) -> str:
         if self._config.sub_url:
             if "{sub_id}" in self._config.sub_url:

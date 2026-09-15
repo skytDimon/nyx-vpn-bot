@@ -10,6 +10,8 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🧪 Получить пробник")],
+            [KeyboardButton(text="💳 Продлить подписку")],
+            [KeyboardButton(text="👤 Личный кабинет"), KeyboardButton(text="👥 Пригласить друга")],
             [KeyboardButton(text="ℹ️ Информация")],
             [KeyboardButton(text="🧑‍💻 Поддержка")],
         ],

@@ -22,7 +22,7 @@ async def main():
     scheduler.add_job(notify_subscriptions, "interval", hours=1, args=[bot])
     scheduler.start()
 
-    from app.handlers import admin, start
+    from app.handlers import admin, cabinet, payment, referral, start
 
     try:
         await bot.set_my_commands(
@@ -35,6 +35,9 @@ async def main():
         logging.warning("Failed to set bot commands (will retry later)")
     dp = Dispatcher()
     dp.include_router(start.router)
+    dp.include_router(payment.router)
+    dp.include_router(referral.router)
+    dp.include_router(cabinet.router)
     dp.include_router(admin.router)
     try:
         await dp.start_polling(bot)

@@ -35,3 +35,8 @@ def get_admin_pass() -> str:
 
 def get_database_url() -> str:
     return _require("DATABASE_URL")
+
+
+def get_bot_username() -> str:
+    load_env()
+    return os.getenv("BOT_USERNAME", "testnyxvpnbot")

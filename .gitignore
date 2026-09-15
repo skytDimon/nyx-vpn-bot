@@ -1,16 +1,42 @@
+# Секреты и локальная конфигурация
 .env
+.env.*
+!.env.example
 services/bot/.env
+services/admin/.env
+
+# Сгенерированные TLS/ACME-материалы (приватные ключи, сертификаты, токены) — НИКОГДА не коммитим
+docker/certbot/
+*.pem
+*.key
+*.crt
+*.csr
+
+# Python
 env/
-**/__pycache__/
-*.pyc
-.DS_Store
-*.db
-.ruff_cache/
-.idea/
-.vscode/
 .venv/
 **/.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
 *.egg-info/
 dist/
 build/
+.ruff_cache/
+.pytest_cache/
+
+# БД / дампы / логи
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+*.log
+logs/
+
+# IDE / ОС
+.idea/
+.vscode/
+.DS_Store
+
+# Локальные артефакты Claude
 CLAUDE.md

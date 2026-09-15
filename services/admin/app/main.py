@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.config import get_admin_pass, get_admin_user, load_env
-from app.routes import subscriptions, users
+from app.routes import cabinet, subscriptions, users
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
     app.include_router(users.router, dependencies=[Depends(require_auth)])
     app.include_router(subscriptions.router, dependencies=[Depends(require_auth)])
+    app.include_router(cabinet.router)
 
     @app.get("/", response_class=HTMLResponse)
     async def root(request: Request):
