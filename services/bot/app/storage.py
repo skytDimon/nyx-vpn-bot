@@ -302,6 +302,23 @@ def get_user_username(tg_id: int) -> str | None:
             return row.get("username") if row else None
 
 
+def find_tg_id_by_username(username: str) -> int | None:
+    """Найти tg_id по username в БД (регистронезависимо, с '@' или без)."""
+    if not username:
+        return None
+    cand = username.lstrip("@").strip()
+    if not cand:
+        return None
+    with _connect() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT tg_id FROM users WHERE LOWER(username) = LOWER(%s)",
+                (cand,),
+            )
+            row = cur.fetchone()
+            return int(row["tg_id"]) if row and row.get("tg_id") else None
+
+
 def set_referrer(tg_id: int, referrer_tg_id: int) -> bool:
     """Установить реферера (один раз). Возвращает True если установлен."""
     if tg_id == referrer_tg_id:

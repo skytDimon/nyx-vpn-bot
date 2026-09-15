@@ -5,8 +5,10 @@
   --apply: реально пишет users + subscriptions (UPSERT + кэш).
 Резолв email:
   - @tg_{digits} → tg_id напрямую;
-  - @username → Telegram Bot.get_chat("@username") → tg_id (батч с кэшем);
-  - без @ / сервис-имя (vlad, admin, Boris...) / нерезолвимое → skip (НЕ пишем).
+  - в users по username (бот хранит username каждого, кто стартовал бота — бьёт все
+    @{username} вроде @SkytNinja, @CANDDYBO1, @vlad, @admin, @Boris — без вызова Telegram);
+  - @username → Telegram Bot.get_chat("@username");
+  - без @ / итоговый miss → skip.
 """
 from __future__ import annotations
 
@@ -22,7 +24,7 @@ from aiogram.exceptions import TelegramBadRequest
 
 from app.config import get_bot_token, get_jwt_secret, load_env  # noqa: F401
 from app.services.xui_client import XuiClient
-from app.storage import ensure_user, set_subscription
+from app.storage import ensure_user, find_tg_id_by_username, set_subscription
 from app.vpn_instructions import vpn_instructions  # noqa: F401 пакетный
 
 logger = logging.getLogger(__name__)
@@ -30,12 +32,13 @@ logger = logging.getLogger(__name__)
 
 _RE_TG_ID = re.compile(r"^@tg_(\d+)$", re.IGNORECASE)
 _RE_USERNAME = re.compile(r"^@([A-Za-z][A-Za-z0-9_]{3,31})$")
+_RE_BARE_USERNAME = re.compile(r"^([A-Za-z][A-Za-z0-9_]{3,31})$")
 
 
 async def resolve_tg_id(bot: Bot, email: str, username_cache: dict[str, int | None]) -> tuple[int | None, str | None]:
     """
     Вернуть (tg_id, username_or_None). На skip: (None, None).
-    username_cache — кэш резолва @username → tg_id.
+    Приоритет: (1) БД, (2) Telegram. Кэш username_cache — ключ в нижнем регистре.
     """
     m = _RE_TG_ID.match(email)
     if m:
@@ -43,30 +46,45 @@ async def resolve_tg_id(bot: Bot, email: str, username_cache: dict[str, int | No
             tg_id = int(m.group(1))
         except ValueError:
             return None, None
-        # username неизвестен — в БД NULL, в ensure_user не меняем существующий
         return tg_id, None
 
     m = _RE_USERNAME.match(email)
-    if not m:
-        return None, None
-    uname = m.group(1)
-    if uname.lower() in {x.lower(): x for x in username_cache}:
-        # ключи в нижнем регистре — ищем по uname.lower()
-        for k, v in username_cache.items():
-            if k.lower() == uname.lower():
-                return v, k if v is not None else None
-    # Telegram резолв: public @username → Chat.id
+    if m:
+        cand = m.group(1)
+    else:
+        # Панель также может хранить email без '@' (vlad, admin, Boris...)
+        m2 = _RE_BARE_USERNAME.match(email)
+        if not m2:
+            return None, None
+        cand = m2.group(1)
+
+    key = cand.lower()
+    if key in username_cache:
+        cached = username_cache[key]
+        # храним (tg_id), username лежит в ключе
+        return cached, (cand if cached is not None else None)
+
+    # 1) БД — все, кто хоть раз писал боту (start гарантирует ensure_user)
     try:
-        chat = await bot.get_chat(f"@{uname}")
+        db_tg = find_tg_id_by_username(cand)
+    except Exception:  # БД недоступна — продолжаем в Telegram
+        db_tg = None
+    if db_tg is not None:
+        username_cache[key] = db_tg
+        return db_tg, cand
+
+    # 2) Telegram публичный юзернейм
+    try:
+        chat = await bot.get_chat(f"@{cand}")
         tg_id = int(getattr(chat, "id", 0) or 0)
         if tg_id <= 0:
-            username_cache[uname] = None
+            username_cache[key] = None
             return None, None
-        username_cache[uname] = tg_id
-        username = getattr(chat, "username", None) or uname
+        username_cache[key] = tg_id
+        username = getattr(chat, "username", None) or cand
         return tg_id, username
     except TelegramBadRequest:
-        username_cache[uname] = None
+        username_cache[key] = None
         return None, None
     except Exception:  # сеть/токен — пробрасываем выше, это не skip
         raise

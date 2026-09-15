@@ -112,7 +112,7 @@ def get_subscription(tg_id: int) -> dict | None:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT tg_id, start_at, end_at, subscription_link, instructions, updated_at
+                SELECT tg_id, start_at, end_at, subscription_link, instructions, client_uuid, sub_id, updated_at
                 FROM subscriptions
                 WHERE tg_id = %s
                 """,

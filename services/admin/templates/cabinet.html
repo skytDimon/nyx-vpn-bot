@@ -229,6 +229,8 @@
         const statusBadge = document.getElementById('status-badge');
         if (data.is_active) {
           statusBadge.innerHTML = '<span class="status active"><span class="dot"></span> Активна</span>';
+        } else if (data.reason === 'deleted_from_panel') {
+          statusBadge.innerHTML = '<span class="status inactive"><span class="dot"></span> Доступ отключён</span>';
         } else {
           statusBadge.innerHTML = '<span class="status inactive"><span class="dot"></span> Неактивна</span>';
         }
@@ -258,7 +260,10 @@
             </div>
           `;
         } else {
-          subInfo.innerHTML = '<div class="field"><div class="value" style="color:var(--muted)">Подписка не найдена. Нажмите «Продлить подписку» или получите пробник в боте.</div></div>';
+          const msg = data.reason === 'deleted_from_panel'
+            ? '<div class="field"><div class="value" style="color:#ffb3bf;font-weight:700">Доступ отключён — профиль удалён из системы. Напишите в поддержку, чтобы восстановить.</div><div style="margin-top:10px"><a href="tg://resolve?domain={{ bot_username }}&start=support" class="btn btn-primary">🧑‍💻 Поддержка</a></div></div>'
+            : '<div class="field"><div class="value" style="color:var(--muted)">Подписка не найдена. Нажмите «Продлить подписку» или получите пробник в боте.</div></div>';
+          subInfo.innerHTML = msg;
         }
 
         document.getElementById('referral-balance').innerHTML = `${data.referral_balance}<small> ₽</small>`;
