@@ -319,6 +319,115 @@ def find_tg_id_by_username(username: str) -> int | None:
             return int(row["tg_id"]) if row and row.get("tg_id") else None
 
 
+# ── pending_subscriptions (панель → username → /start → tg_id) ──────────────
+
+def _norm_pending_username(username: str) -> str | None:
+    cand = (username or "").lstrip("@").strip().lower()
+    return cand or None
+
+
+def upsert_pending_subscription(
+    username: str,
+    email: str,
+    start_at: datetime,
+    end_at: datetime,
+    subscription_link: str,
+    instructions: str,
+    country: str = "nl",
+    client_uuid: str | None = None,
+    sub_id: str | None = None,
+) -> None:
+    """UPSERT в pending_subscriptions по нормализованному username."""
+    norm = _norm_pending_username(username)
+    if not norm:
+        return
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO pending_subscriptions
+                    (username, email, start_at, end_at, subscription_link, instructions, country, client_uuid, sub_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (username) DO UPDATE SET
+                    email = EXCLUDED.email,
+                    start_at = EXCLUDED.start_at,
+                    end_at = EXCLUDED.end_at,
+                    subscription_link = EXCLUDED.subscription_link,
+                    instructions = EXCLUDED.instructions,
+                    country = EXCLUDED.country,
+                    client_uuid = EXCLUDED.client_uuid,
+                    sub_id = EXCLUDED.sub_id,
+                    updated_at = NOW()
+                """,
+                (norm, email, start_at, end_at, subscription_link, instructions, country, client_uuid, sub_id),
+            )
+
+
+def claim_pending_for_user(tg_id: int, username: str | None) -> dict | None:
+    """Если есть pending для username — перенести в subscriptions и удалить pending.
+
+    Вызывать при каждом /start / любом сообщении где известен username.
+    Возвращает pending-запись если перенос был, иначе None.
+    """
+    norm = _norm_pending_username(username or "")
+    if not norm:
+        return None
+    with _connect() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT username, email, start_at, end_at, subscription_link, instructions, country, client_uuid, sub_id
+                FROM pending_subscriptions WHERE username = %s
+                """,
+                (norm,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            end_at = _normalize_dt(row["end_at"])
+            if not end_at or end_at < datetime.now(timezone.utc):
+                cur.execute("DELETE FROM pending_subscriptions WHERE username = %s", (norm,))
+                return None
+            cur.execute(
+                """
+                INSERT INTO subscriptions (tg_id, start_at, end_at, subscription_link, instructions, country, client_uuid, sub_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (tg_id) DO UPDATE SET
+                    start_at = EXCLUDED.start_at,
+                    end_at = EXCLUDED.end_at,
+                    subscription_link = EXCLUDED.subscription_link,
+                    instructions = EXCLUDED.instructions,
+                    country = EXCLUDED.country,
+                    client_uuid = EXCLUDED.client_uuid,
+                    sub_id = EXCLUDED.sub_id,
+                    updated_at = NOW()
+                """,
+                (
+                    tg_id,
+                    row["start_at"],
+                    row["end_at"],
+                    row["subscription_link"],
+                    row["instructions"],
+                    row.get("country") or "nl",
+                    row.get("client_uuid"),
+                    row.get("sub_id"),
+                ),
+            )
+            cur.execute("DELETE FROM pending_subscriptions WHERE username = %s", (norm,))
+            pending = dict(row)
+    _cache_set_subscription(
+        tg_id,
+        pending.get("start_at"),
+        _normalize_dt(pending.get("end_at")),
+        pending.get("subscription_link"),
+        pending.get("instructions"),
+        pending.get("country") or "nl",
+        pending.get("client_uuid"),
+        pending.get("sub_id"),
+    )
+    return pending
+
+
 def set_referrer(tg_id: int, referrer_tg_id: int) -> bool:
     """Установить реферера (один раз). Возвращает True если установлен."""
     if tg_id == referrer_tg_id:

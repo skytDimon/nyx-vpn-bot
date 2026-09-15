@@ -13,6 +13,7 @@ from app.config import get_trial_days
 from app.keyboards.menu import main_menu_keyboard, renew_keyboard
 from app.services.xui_client import XuiClient
 from app.storage import (
+    claim_pending_for_user,
     ensure_user,
     get_subscription,
     is_trial_used,
@@ -28,6 +29,14 @@ logger = logging.getLogger(__name__)
 @router.message(CommandStart())
 async def start_handler(message: Message):
     ensure_user(message.from_user.id, message.from_user.username)
+    claim = claim_pending_for_user(message.from_user.id, message.from_user.username)
+    if claim:
+        logger.info(
+            "claimed pending subscription for tg_id=%s username=%s end_at=%s",
+            message.from_user.id,
+            message.from_user.username,
+            claim.get("end_at"),
+        )
 
     payload = _extract_start_payload(message.text)
     if payload:
@@ -45,11 +54,21 @@ async def start_handler(message: Message):
             return
 
     image_path = Path(__file__).resolve().parents[2] / "img" / "start.png"
-    text = (
-        "🐾 Привет! Это твой личный VPN‑сервис.\n"
-        "🌐 Свободный интернет прямо в Telegram.\n\n"
-        "Нажми кнопку ниже, чтобы получить пробный доступ на 3 дня."
-    )
+    if claim:
+        end_at = claim.get("end_at")
+        end_s = end_at.strftime("%d.%m.%Y") if end_at else "—"
+        text = (
+            "🐾 Привет! Это твой личный VPN‑сервис.\n"
+            "🌐 Свободный интернет прямо в Telegram.\n\n"
+            f"✅ Мы нашли твою активную подписку в системе — она доступна до {end_s}.\n"
+            "Открой «Личный кабинет», чтобы получить ссылку."
+        )
+    else:
+        text = (
+            "🐾 Привет! Это твой личный VPN‑сервис.\n"
+            "🌐 Свободный интернет прямо в Telegram.\n\n"
+            "Нажми кнопку ниже, чтобы получить пробный доступ на 3 дня."
+        )
     if image_path.exists():
         await message.answer_photo(
             FSInputFile(str(image_path)),
@@ -125,6 +144,7 @@ async def trial_callback(callback: CallbackQuery):
 
 async def _request_trial(user, message, callback=None):
     ensure_user(user.id, user.username)
+    claim_pending_for_user(user.id, user.username)
 
     if is_trial_used(user.id):
         _, end_at = get_subscription(user.id)
