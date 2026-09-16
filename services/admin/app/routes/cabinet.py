@@ -8,9 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import jwt
-from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import get_bot_username, get_xui_settings
 from app.db import get_subscription, get_user
@@ -19,8 +18,8 @@ from app.services.xui_panel import XuiCabinetChecker
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parents[2]
+CABINET_DIR = BASE_DIR / "static" / "cabinet"
 router = APIRouter(prefix="/cabinet", tags=["cabinet"])
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 # Кэш живой сверки с панелью: tg_id → (is_present|None, expires_monotonic).
 # Панель не дёргается на каждую загрузку страницы; None (панель недоступна) НЕ кэшируем.
@@ -73,14 +72,17 @@ def _decode_token(token: str) -> int:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-@router.get("", response_class=HTMLResponse)
-async def cabinet_page(request: Request, t: str = Query(...)):
-    """HTML-страница личного кабинета."""
-    tg_id = _decode_token(t)
-    return templates.TemplateResponse(
-        "cabinet.html",
-        {"request": request, "token": t, "tg_id": tg_id, "bot_username": get_bot_username()},
-    )
+@router.get("")
+async def cabinet_page(t: str = Query(...)):
+    """HTML-страница личного кабинета (React SPA, собирается из nyx_vpn_index_web)."""
+    _decode_token(t)
+    index = CABINET_DIR / "index.html"
+    if not index.exists():
+        raise HTTPException(
+            status_code=500,
+            detail="Cabinet SPA not built. Run: cd nyx_vpn_index_web && npm install && npm run build",
+        )
+    return FileResponse(str(index))
 
 
 @router.get("/api/subscription")
@@ -125,6 +127,10 @@ async def cabinet_api(t: str = Query(...)):
         "reason": reason,
         "subscription": None,
         "referral_balance": int(user.get("referral_balance") or 0),
+        "bot_username": get_bot_username(),
+        "sbp_phone": os.getenv("SBP_PHONE_NUMBER"),
+        "payment_amount": int(os.getenv("PAYMENT_AMOUNT", "150")),
+        "payment_days": int(os.getenv("PAYMENT_DAYS", "30")),
     }
 
     if sub:

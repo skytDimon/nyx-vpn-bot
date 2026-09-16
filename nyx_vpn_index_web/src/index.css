@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* === Base reset for XP style === */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  overflow-x: hidden;
+  font-family: 'Courier New', Courier, monospace;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+}
+
+body {
+  background-color: #02007F;
+  margin: 0;
+  padding: 0;
+}
+
+/* === Scrollbar XP style === */
+::-webkit-scrollbar {
+  width: 16px;
+}
+
+::-webkit-scrollbar-track {
+  background: #C3C3C3;
+  border-left: 2px solid #F0F0F0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C3C3C3;
+  border: 2px solid;
+  border-color: #F0F0F0 #262626 #262626 #F0F0F0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #DBDBDB;
+}
+
+::-webkit-scrollbar-button {
+  height: 16px;
+  background: #C3C3C3;
+  border: 2px solid;
+  border-color: #F0F0F0 #262626 #262626 #F0F0F0;
+}
+
+/* === Selection XP style === */
+::selection {
+  background: #02007F;
+  color: #FFFFFF;
+}
+
+/* === Animations === */
+@keyframes xp-boot {
+  0% { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.xp-boot-in {
+  animation: xp-boot 0.3s ease-out;
+}

@@ -37,6 +37,13 @@ def create_app() -> FastAPI:
     app = FastAPI(title="VPN Admin")
 
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+    cabinet_static = BASE_DIR / "static" / "cabinet" / "assets"
+    if cabinet_static.exists():
+        app.mount(
+            "/cabinet/assets",
+            StaticFiles(directory=str(cabinet_static)),
+            name="cabinet-assets",
+        )
     app.include_router(users.router, dependencies=[Depends(require_auth)])
     app.include_router(subscriptions.router, dependencies=[Depends(require_auth)])
     app.include_router(cabinet.router)
