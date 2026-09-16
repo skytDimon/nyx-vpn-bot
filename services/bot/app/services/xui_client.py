@@ -106,61 +106,113 @@ class XuiClient:
             "subId": sub_id,
         }
 
-        # 3x-ui clients/add добавляет клиента в ОДИН инбаунд за вызов (поле
-        # inboundUuid — единственное число). Поэтому проходим по каждому
-        # настроенному id, резолвим его UUID и создаём клиента отдельно.
-        uuid_by_id = {
-            ib.get("id"): ib.get("uuid")
-            for ib in await self._list_inbounds()
-            if ib.get("id") in self._config.inbound_ids
-        }
+        inbounds = await self._list_inbounds()
+        if inbounds:
+            logger.info("XUI inbound keys sample: %s", sorted(inbounds[0].keys()))
+        # Разрешаем uuid каждого настроенного инбаунда (клиенты/add ждёт inboundIds=UUID).
+        uuid_by_id = await self._resolve_inbound_uuids(inbounds)
 
+        # 1. Многондовый путь: один clients/add со всеми UUID — одна подписка на все ноды.
+        inbound_uuids = [uuid_by_id[i] for i in self._config.inbound_ids if uuid_by_id.get(i)]
+        if len(inbound_uuids) == len(self._config.inbound_ids):
+            ok, msg = await self._clients_add(client, inbound_uuids)
+            if ok:
+                logger.info(
+                    "XUI client %s added to inbounds %s via clients/add", email, self._config.inbound_ids
+                )
+                return sub_id
+            logger.warning("XUI clients/add failed (%s); falling back to per-inbound update", msg)
+
+        # 2. Фолбэк: добавляем клиента в каждый инбаунд через update по числовому id.
         errors: list[str] = []
-        for inbound_id in self._config.inbound_ids:
-            uuid = uuid_by_id.get(inbound_id)
-            if not uuid:
-                errors.append(f"inbound {inbound_id}: uuid not found on panel")
+        for inbound in inbounds:
+            inbound_id = inbound.get("id")
+            if inbound_id not in self._config.inbound_ids:
                 continue
-            ok, msg = await self._add_client_one_inbound(client, uuid, inbound_id)
+            ok, msg = await self._add_client_via_inbound_update(inbound, client)
             if not ok:
                 errors.append(f"inbound {inbound_id}: {msg}")
-
         if errors:
             raise RuntimeError("XUI add_client failed: " + "; ".join(errors))
+        if not any(ib.get("id") in self._config.inbound_ids for ib in inbounds):
+            raise RuntimeError(
+                f"XUI add_client: none of configured inbounds {self._config.inbound_ids} found on panel "
+                f"(got ids {[ib.get('id') for ib in inbounds]})"
+            )
         return sub_id
 
-    async def _add_client_one_inbound(self, client: dict, uuid: str, inbound_id: int) -> tuple[bool, str]:
-        """Добавить клиента в один инбаунд. Пробует modern clients/add, затем legacy addClient."""
-        last_msg = "no working endpoint"
+    async def _resolve_inbound_uuids(self, inbounds: list[dict]) -> dict[int, str]:
+        uuid_by_id: dict[int, str] = {}
+        for inbound in inbounds:
+            inbound_id = inbound.get("id")
+            if inbound_id not in self._config.inbound_ids:
+                continue
+            uuid = inbound.get("uuid")
+            if not uuid:
+                uuid = await self._fetch_inbound_uuid(inbound_id)
+            if uuid:
+                uuid_by_id[inbound_id] = uuid
+        return uuid_by_id
 
-        # 1. Modern 3x-ui API: /panel/api/clients/add, inboundUuid (один инбаунд).
+    async def _fetch_inbound_uuid(self, inbound_id: int) -> str | None:
+        """Достать uuid инбаунда из get-эндпоинта (в list его может не быть)."""
+        paths = [
+            f"{self._config.base_path}/panel/api/inbounds/get/{inbound_id}",
+            f"{self._config.base_path}/panel/api/inbound/get/{inbound_id}",
+        ]
+        for path in paths:
+            response = await self._client.get(path)
+            content_type = response.headers.get("content-type", "")
+            if response.status_code == 404 or "application/json" not in content_type:
+                continue
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                continue
+            if not data.get("success"):
+                continue
+            obj = data.get("obj") or data.get("data") or {}
+            if isinstance(obj, dict):
+                uuid = obj.get("uuid")
+                if uuid:
+                    return uuid
+        return None
+
+    async def _clients_add(self, client: dict, inbound_uuids: list[str]) -> tuple[bool, str]:
         path = f"{self._config.base_path}/panel/api/clients/add"
-        response = await self._post(path, {"client": client, "inboundUuid": uuid}, mode="json")
-        ok, msg = self._ok(response)
-        if ok:
-            logger.info("XUI client added to inbound %s via clients/add", inbound_id)
-            return True, msg
-        last_msg = msg
+        response = await self._post(path, {"client": client, "inboundIds": inbound_uuids}, mode="json")
+        return self._ok(response)
 
-        # 2/3. Legacy per-inbound API (числовой id, затем uuid).
-        settings = {"clients": [client]}
-        for payload_id, label in ((inbound_id, "id"), (uuid, "uuid")):
-            payload = {"id": payload_id, "settings": json.dumps(settings)}
-            for sub_path in (
-                "/panel/api/inbounds/addClient",
-                "/panel/inbound/addClient",
-            ):
-                path = f"{self._config.base_path}{sub_path}"
-                for mode in ("data", "json"):
-                    response = await self._post(path, payload, mode=mode)
-                    ok, msg = self._ok(response)
-                    if ok:
-                        logger.info(
-                            "XUI client added to inbound %s via %s (%s)",
-                            inbound_id, sub_path, mode,
-                        )
-                        return True, msg
-                    last_msg = msg
+    async def _add_client_via_inbound_update(self, inbound: dict, client: dict) -> tuple[bool, str]:
+        """Добавить клиента в инбаунд, перезаписав его settings.clients (по числовому id)."""
+        inbound_id = inbound.get("id")
+        settings = inbound.get("settings")
+        if isinstance(settings, str):
+            try:
+                settings = json.loads(settings)
+            except json.JSONDecodeError:
+                return False, "settings not parseable"
+        if not isinstance(settings, dict):
+            return False, "settings missing/not object"
+        clients = settings.get("clients")
+        clients = clients if isinstance(clients, list) else []
+        if any(c.get("email") == client.get("email") for c in clients):
+            return True, "already present"
+        full = dict(inbound)
+        full["settings"] = json.dumps({**settings, "clients": clients + [client]})
+        payload = {k: v for k, v in full.items() if k != "id"}
+        paths = [
+            f"{self._config.base_path}/panel/api/inbounds/update/{inbound_id}",
+        ]
+        last_msg = "no update endpoint"
+        for path in paths:
+            for mode in ("json", "data"):
+                response = await self._post(path, payload, mode=mode)
+                ok, msg = self._ok(response)
+                if ok:
+                    logger.info("XUI client added to inbound %s via update (%s)", inbound_id, mode)
+                    return True, msg
+                last_msg = msg
         return False, last_msg
 
     @staticmethod
