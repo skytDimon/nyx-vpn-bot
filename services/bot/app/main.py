@@ -7,6 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.config import get_bot_token
 from app.notifications import notify_subscriptions
 from app.preflight import run_preflight
+from app.services.server_monitor import check_all_servers
 from app.storage import init_db, purge_expired_subscriptions
 
 
@@ -20,9 +21,13 @@ async def main():
     scheduler = AsyncIOScheduler()
     scheduler.add_job(purge_expired_subscriptions, "interval", hours=12)
     scheduler.add_job(notify_subscriptions, "interval", hours=1, args=[bot])
+    scheduler.add_job(check_all_servers, "interval", hours=5)
     scheduler.start()
 
-    from app.handlers import admin, cabinet, payment, referral, start
+    # Run initial server check in background so cache is warm
+    asyncio.create_task(check_all_servers())
+
+    from app.handlers import admin, cabinet, payment, referral, servers, start
 
     try:
         await bot.set_my_commands(
@@ -38,6 +43,7 @@ async def main():
     dp.include_router(payment.router)
     dp.include_router(referral.router)
     dp.include_router(cabinet.router)
+    dp.include_router(servers.router)
     dp.include_router(admin.router)
     try:
         await dp.start_polling(bot)

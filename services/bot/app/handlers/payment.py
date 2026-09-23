@@ -1,5 +1,7 @@
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.filters.callback_data import CallbackData
@@ -23,6 +25,7 @@ from app.storage import (
     get_subscription_meta,
     get_user_username,
     record_first_payment_and_reward,
+    set_subscription,
 )
 from app.utils.email import send_payment_notification
 
@@ -114,28 +117,40 @@ async def approve_payment(callback: CallbackQuery, callback_data: PaymentCallbac
     days = get_payment_days()
 
     meta = get_subscription_meta(user_id)
-    if not meta:
-        await callback.answer("❌ Подписка не найдена", show_alert=True)
-        return
 
-    email = meta.get("client_uuid")
+    # Определяем email: берём из записи, иначе строим из username.
+    email = meta.get("client_uuid") if meta else None
     if not email or not email.startswith("@"):
         username = get_user_username(user_id)
         email = f"@{username}" if username else f"@tg_{user_id}"
 
     client = XuiClient.from_env()
     try:
-        new_end_at = await client.extend_client(
-            email, days, current_end_at=meta.get("end_at")
-        )
+        if meta:
+            # Клиент уже существует — просто продлеваем.
+            new_end_at = await client.extend_client(
+                email, days, current_end_at=meta.get("end_at")
+            )
+            extend_subscription(user_id, days)
+        else:
+            # Подписки нет (истекла/удалена) — создаём заново.
+            from datetime import datetime, timedelta, timezone
+            sub_id = await client.add_client(email=email, days=days)
+            sub_link = client.subscription_link(sub_id)
+            from app.vpn_instructions import vpn_instructions
+            instructions = vpn_instructions(sub_link)
+            start_at = datetime.now(timezone.utc)
+            new_end_at = start_at + timedelta(days=days)
+            set_subscription(
+                user_id, start_at, new_end_at, sub_link, instructions, "nl",
+                client_uuid=email, sub_id=sub_id,
+            )
     except Exception:
-        logger.exception("Failed to extend XUI client for user %s", user_id)
+        logger.exception("Failed to provision XUI client for user %s", user_id)
         await callback.answer("❌ Ошибка продления на панели", show_alert=True)
         return
     finally:
         await client.close()
-
-    extend_subscription(user_id, days)
 
     reward_result = record_first_payment_and_reward(user_id, reward=75)
 

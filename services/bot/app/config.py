@@ -111,3 +111,48 @@ def get_jwt_secret() -> str:
 
 def get_cabinet_url() -> str:
     return _require("CABINET_URL")
+
+
+@dataclass
+class VpnServer:
+    name: str
+    host: str
+    port: int
+
+
+def get_vpn_servers() -> list[VpnServer]:
+    """Parse VPN_SERVERS env var.
+
+    Format: ``name:host:port,name:host:port,...``
+    Example: ``🇳🇱 Нидерланды:185.1.2.3:443,🇩🇪 Германия:195.4.5.6:443``
+
+    Falls back to extracting the host from XUI_URL if VPN_SERVERS is not set.
+    """
+    load_env()
+    raw = os.getenv("VPN_SERVERS", "").strip()
+    if raw:
+        servers: list[VpnServer] = []
+        for entry in raw.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            parts = entry.rsplit(":", 2)
+            if len(parts) == 3:
+                name, host, port_s = parts
+                servers.append(VpnServer(name=name.strip(), host=host.strip(), port=int(port_s)))
+            elif len(parts) == 2:
+                name, host = parts
+                servers.append(VpnServer(name=name.strip(), host=host.strip(), port=443))
+        return servers
+
+    # Fallback: extract host from XUI_URL
+    from urllib.parse import urlsplit
+
+    xui_url = os.getenv("XUI_URL", "")
+    if xui_url:
+        parsed = urlsplit(xui_url)
+        host = parsed.hostname or ""
+        port = parsed.port or 443
+        if host:
+            return [VpnServer(name="VPN Server", host=host, port=port)]
+    return []
