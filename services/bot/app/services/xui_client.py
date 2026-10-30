@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
@@ -98,6 +99,8 @@ class XuiClient:
         sub_id = uuid4().hex
         client = {
             "id": client_id,
+            # Hysteria-инбаунды авторизуют клиента по auth, а не по id.
+            "auth": secrets.token_hex(16),
             "email": email,
             "enable": True,
             "expiryTime": expiry_time,
